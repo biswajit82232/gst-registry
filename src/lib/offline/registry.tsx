@@ -25,11 +25,14 @@ import {
 } from "./db";
 import {
   findLocalSupplier,
+  isAuthError,
+  isTransientError,
   newId,
   nowIso,
   purchaseFromInput,
   runSync,
   SYNC_MS,
+  WRITE_DEBOUNCE_MS,
 } from "./sync";
 
 function sortPurchases(rows: Purchase[]): Purchase[] {
@@ -44,7 +47,9 @@ function samePurchases(a: Purchase[], b: Purchase[]): boolean {
     if (
       a[i].id !== b[i].id ||
       a[i].updated_at !== b[i].updated_at ||
-      a[i].input_status !== b[i].input_status
+      a[i].input_status !== b[i].input_status ||
+      a[i].invoice_total !== b[i].invoice_total ||
+      a[i].supplier_name !== b[i].supplier_name
     ) {
       return false;
     }
@@ -132,6 +137,12 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
   const queuedRef = useRef(false);
   const pendingRef = useRef(0);
   const firstDownloadRef = useRef(false);
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const backoffMsRef = useRef(0);
+  const authBlockedRef = useRef(false);
+  const lastFailRef = useRef<"none" | "transient" | "auth" | "other">("none");
+  const writeTimerRef = useRef(0);
+  const retryTimerRef = useRef(0);
 
   const [ready, setReady] = useState(false);
   const [firstDownload, setFirstDownload] = useState(false);
@@ -152,6 +163,11 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
 
   const setMonth = useCallback((next: string) => {
     setMonthState(next);
+  }, []);
+
+  const getSupabase = useCallback(() => {
+    if (!supabaseRef.current) supabaseRef.current = createClient();
+    return supabaseRef.current;
   }, []);
 
   const reload = useCallback(async () => {
@@ -201,45 +217,86 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
     reloadRef.current = reload;
   }, [reload]);
 
-  const syncNow = useCallback(async function syncNow() {
-    const db = dbRef.current;
-    const uid = userIdRef.current;
-    if (!db || !uid) return;
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      setOnline(false);
-      return;
-    }
-    if (syncingRef.current) {
-      queuedRef.current = true;
-      return;
-    }
-    const show = firstDownloadRef.current || pendingRef.current > 0;
-    syncingRef.current = true;
-    if (show) setSyncing(true);
-    try {
-      const supabase = createClient();
-      const result = await runSync(db, supabase, uid);
-      setSyncError(result.error);
-      setMissingSuppliersTable(result.missingSuppliersTable);
-      if (result.changed) await reloadRef.current();
-      else setLastSyncAt(Date.now());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Sync failed.";
-      setSyncError(message);
-    } finally {
-      syncingRef.current = false;
-      if (show) setSyncing(false);
-      if (queuedRef.current) {
-        queuedRef.current = false;
-        void syncNow();
+  const runSyncCycle = useCallback(
+    async function runSyncCycle(opts?: { fromUser?: boolean }) {
+      const db = dbRef.current;
+      const uid = userIdRef.current;
+      if (!db || !uid) return;
+      if (authBlockedRef.current && !opts?.fromUser) return;
+      if (syncingRef.current) {
+        queuedRef.current = true;
+        return;
       }
-    }
-  }, []);
+      const show = firstDownloadRef.current || pendingRef.current > 0;
+      syncingRef.current = true;
+      if (show) setSyncing(true);
+      try {
+        const result = await runSync(db, getSupabase(), uid);
+        lastFailRef.current = "none";
+        backoffMsRef.current = 0;
+        authBlockedRef.current = false;
+        setOnline(true);
+        setSyncError(result.error);
+        setMissingSuppliersTable(result.missingSuppliersTable);
+        if (result.changed) await reloadRef.current();
+        else setLastSyncAt(Date.now());
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Sync failed.";
+        setSyncError(message);
+        if (isAuthError(message)) {
+          lastFailRef.current = "auth";
+          authBlockedRef.current = true;
+          queuedRef.current = false;
+        } else if (isTransientError(message)) {
+          lastFailRef.current = "transient";
+          setOnline(false);
+          backoffMsRef.current = Math.min(
+            SYNC_MS,
+            Math.max(1_000, (backoffMsRef.current || 500) * 2),
+          );
+        } else {
+          lastFailRef.current = "other";
+          backoffMsRef.current = SYNC_MS;
+        }
+      } finally {
+        syncingRef.current = false;
+        if (show) setSyncing(false);
+        if (queuedRef.current) {
+          queuedRef.current = false;
+          if (lastFailRef.current === "auth") return;
+          const wait = lastFailRef.current === "none" ? 0 : backoffMsRef.current;
+          if (wait > 0) {
+            window.clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = window.setTimeout(() => {
+              void runSyncCycle();
+            }, wait);
+          } else {
+            void runSyncCycle();
+          }
+        }
+      }
+    },
+    [getSupabase],
+  );
+
+  const syncNow = useCallback(async function syncNow() {
+    authBlockedRef.current = false;
+    window.clearTimeout(writeTimerRef.current);
+    window.clearTimeout(retryTimerRef.current);
+    await runSyncCycle({ fromUser: true });
+  }, [runSyncCycle]);
+
+  const syncSoon = useCallback(() => {
+    window.clearTimeout(writeTimerRef.current);
+    writeTimerRef.current = window.setTimeout(() => {
+      void runSyncCycle();
+    }, WRITE_DEBOUNCE_MS);
+  }, [runSyncCycle]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const supabase = createClient();
+      const supabase = getSupabase();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -260,7 +317,7 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
       if (!alive) return;
       setFirstDownload(!seeded);
       setReady(true);
-      await syncNow();
+      await runSyncCycle({ fromUser: true });
     })().catch(() => {
       if (alive) {
         setSyncError("Could not open the local register.");
@@ -270,30 +327,46 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [reload, syncNow]);
+  }, [getSupabase, reload, runSyncCycle]);
 
   useEffect(() => {
+    let wakeTimer = 0;
+    const wake = () => {
+      authBlockedRef.current = false;
+      window.clearTimeout(wakeTimer);
+      wakeTimer = window.setTimeout(() => {
+        void runSyncCycle();
+      }, 300);
+    };
     const onOnline = () => {
       setOnline(true);
-      void syncNow();
+      wake();
     };
     const onOffline = () => setOnline(false);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void syncNow();
+      if (document.visibilityState === "visible") wake();
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted || document.visibilityState === "visible") wake();
     };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisible);
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void syncNow();
+      if (document.visibilityState === "visible") void runSyncCycle();
     }, SYNC_MS);
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(timer);
+      window.clearTimeout(wakeTimer);
+      window.clearTimeout(writeTimerRef.current);
+      window.clearTimeout(retryTimerRef.current);
     };
-  }, [syncNow]);
+  }, [runSyncCycle]);
 
   const requireDb = useCallback(() => {
     const db = dbRef.current;
@@ -314,10 +387,10 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
         pendingRef.current += 1;
         setPending(pendingRef.current);
       }
-      void syncNow();
+      syncSoon();
       return purchase;
     },
-    [requireDb, syncNow],
+    [requireDb, syncSoon],
   );
 
   const deletePurchase = useCallback(
@@ -331,9 +404,9 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
         pendingRef.current += 1;
         setPending(pendingRef.current);
       }
-      void syncNow();
+      syncSoon();
     },
-    [requireDb, syncNow],
+    [requireDb, syncSoon],
   );
 
   const saveSupplier = useCallback(
@@ -380,13 +453,14 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
       }
       const targetIds = new Set([next.id, input.id].filter(Boolean) as string[]);
       const bills = await db.purchases.toArray();
+      const billUpdates: LocalPurchase[] = [];
       for (const bill of bills) {
         if (bill.deleted) continue;
         const linked =
           (bill.supplier_id && targetIds.has(bill.supplier_id)) ||
           (next.gstin && bill.supplier_gstin === next.gstin);
         if (!linked) continue;
-        await db.purchases.put({
+        billUpdates.push({
           ...bill,
           supplier_id: next.id,
           supplier_name: next.name,
@@ -395,11 +469,12 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
           updated_at: now,
         });
       }
+      if (billUpdates.length) await db.purchases.bulkPut(billUpdates);
       await reload();
-      void syncNow();
+      syncSoon();
       return stripSupplier(next);
     },
-    [reload, requireDb, syncNow],
+    [reload, requireDb, syncSoon],
   );
 
   const deleteSupplier = useCallback(
@@ -409,9 +484,9 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
       if (!existing) return;
       await db.suppliers.put({ ...existing, deleted: 1, dirty: 1, updated_at: nowIso() });
       await reload();
-      void syncNow();
+      syncSoon();
     },
-    [reload, requireDb, syncNow],
+    [reload, requireDb, syncSoon],
   );
 
   const saveProfile = useCallback(
@@ -433,9 +508,9 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
         pendingRef.current += 1;
         setPending(pendingRef.current);
       }
-      void syncNow();
+      syncSoon();
     },
-    [requireDb, syncNow],
+    [requireDb, syncSoon],
   );
 
   const markInput = useCallback(
@@ -457,9 +532,9 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
         pendingRef.current += 1;
         setPending(pendingRef.current);
       }
-      void syncNow();
+      syncSoon();
     },
-    [requireDb, syncNow],
+    [requireDb, syncSoon],
   );
 
   const markManyInput = useCallback(
@@ -468,39 +543,42 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
       const now = nowIso();
       const on = status === "waiting" ? null : todayIso();
       const changed = new Set<string>();
-      await Promise.all(
-        ids.map(async (id) => {
-          const existing = await db.purchases.get(id);
-          if (!existing || existing.deleted) return;
-          await db.purchases.put({
-            ...existing,
-            input_status: status,
-            input_on: on,
-            dirty: 1,
-            updated_at: now,
-          });
-          changed.add(id);
-          if (!existing.dirty) pendingRef.current += 1;
-        }),
-      );
-      if (changed.size === 0) return;
+      const updates: LocalPurchase[] = [];
+      const existingRows = await db.purchases.bulkGet(ids);
+      for (const existing of existingRows) {
+        if (!existing || existing.deleted) continue;
+        updates.push({
+          ...existing,
+          input_status: status,
+          input_on: on,
+          dirty: 1,
+          updated_at: now,
+        });
+        changed.add(existing.id);
+        if (!existing.dirty) pendingRef.current += 1;
+      }
+      if (updates.length === 0) return;
+      await db.purchases.bulkPut(updates);
       setPurchases((prev) =>
         prev.map((row) =>
           changed.has(row.id) ? { ...row, input_status: status, input_on: on, updated_at: now } : row,
         ),
       );
       setPending(pendingRef.current);
-      void syncNow();
+      syncSoon();
     },
-    [requireDb, syncNow],
+    [requireDb, syncSoon],
   );
 
   const importPurchases = useCallback(
     async (rows: PurchaseInput[]) => {
       const { db, uid } = requireDb();
       const now = nowIso();
+      const supplierRows = (await db.suppliers.toArray()).filter((row) => !row.deleted);
+      let live = supplierRows.map(stripSupplier);
+      const newSuppliers: LocalSupplier[] = [];
+      const newPurchases: LocalPurchase[] = [];
       for (const input of rows) {
-        const live = (await db.suppliers.toArray()).filter((row) => !row.deleted).map(stripSupplier);
         const match = findLocalSupplier(live, {
           name: input.supplier_name,
           gstin: input.supplier_gstin,
@@ -519,17 +597,20 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
             dirty: 1,
             deleted: 0,
           };
-          await db.suppliers.put(created);
+          newSuppliers.push(created);
+          live = [...live, stripSupplier(created)];
           supplierId = created.id;
         }
         const purchase = purchaseFromInput(uid, { ...input, supplier_id: supplierId });
-        await db.purchases.put({ ...purchase, dirty: 1, deleted: 0 });
+        newPurchases.push({ ...purchase, dirty: 1, deleted: 0 });
       }
+      if (newSuppliers.length) await db.suppliers.bulkPut(newSuppliers);
+      if (newPurchases.length) await db.purchases.bulkPut(newPurchases);
       await reload();
-      void syncNow();
+      syncSoon();
       return rows.length;
     },
-    [reload, requireDb, syncNow],
+    [reload, requireDb, syncSoon],
   );
 
   const clearLocal = useCallback(async () => {
@@ -537,6 +618,7 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
     if (uid) await deleteDb(uid);
     dbRef.current = null;
     userIdRef.current = null;
+    supabaseRef.current = null;
     setPurchases([]);
     setSuppliers([]);
     setProfile(null);

@@ -11,7 +11,7 @@ export function MonthBar({
   onChange: (next: string) => void;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between" role="navigation" aria-label="Month">
       <button
         type="button"
         className="flex h-11 w-11 items-center justify-center rounded-md text-muted active:bg-line/50"

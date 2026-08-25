@@ -1,4 +1,4 @@
-const CACHE = "gst-registry-v1";
+const CACHE = "gst-registry-v2";
 const PRECACHE = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -31,12 +31,14 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("/", copy));
+          if (response.ok && url.pathname === "/") {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put("/", copy));
+          }
           return response;
         })
         .catch(async () => {
-          const cached = (await caches.match("/")) || (await caches.match(request));
+          const cached = (await caches.match(request)) || (await caches.match("/"));
           return cached || Response.error();
         }),
     );

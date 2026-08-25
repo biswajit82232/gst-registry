@@ -5,8 +5,9 @@ import Link from "next/link";
 import { MonthBar } from "@/components/month-bar";
 import { PurchaseCard, PurchaseList, ShowMore } from "@/components/purchase-card";
 import { useWindowed } from "@/components/use-windowed";
+import { useHorizontalSwipe } from "@/components/use-swipe";
 import { Alert, Empty, UnderlineTabs, UndoBar } from "@/components/ui";
-import { formatCompact, monthRange } from "@/lib/format";
+import { formatCompact, monthRange, shiftMonth } from "@/lib/format";
 import { totalsOf } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
 
@@ -31,6 +32,9 @@ export default function HomePage() {
     return rows.filter((row) => row.input_status === filter);
   }, [rows, filter]);
   const windowed = useWindowed(visible, `${month}:${filter}:${visible.length}`);
+  const swipe = useHorizontalSwipe((dir) => {
+    setMonth(shiftMonth(month, dir === "left" ? 1 : -1));
+  });
 
   async function markGot(id: string) {
     try {
@@ -45,7 +49,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="touch-pan-y space-y-5" {...swipe}>
+      <p className="sr-only">Swipe left or right to change month.</p>
       <MonthBar month={month} onChange={setMonth} />
       <p className="tabular text-[13px] text-muted">
         Waiting {formatCompact(totals.waitingGst)}

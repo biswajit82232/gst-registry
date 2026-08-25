@@ -63,6 +63,13 @@ create unique index if not exists suppliers_user_name_uidx
 create index if not exists purchases_user_date_idx
   on public.purchases (user_id, invoice_date desc);
 
+-- Speeds incremental sync (pull rows changed since last watermark).
+create index if not exists purchases_user_updated_idx
+  on public.purchases (user_id, updated_at);
+
+create index if not exists suppliers_user_updated_idx
+  on public.suppliers (user_id, updated_at);
+
 create index if not exists purchases_user_supplier_idx
   on public.purchases (user_id, supplier_name);
 
