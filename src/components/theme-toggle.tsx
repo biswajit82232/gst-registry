@@ -14,10 +14,10 @@ export function ThemeToggle() {
         const dark = document.documentElement.classList.contains("dark");
         setTheme(dark ? "light" : "dark");
       }}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted"
     >
-      <Sun className="hidden h-3.5 w-3.5 dark:block" />
-      <Moon className="h-3.5 w-3.5 dark:hidden" />
+      <Sun className="hidden h-4 w-4 dark:block" />
+      <Moon className="h-4 w-4 dark:hidden" />
     </button>
   );
 }

@@ -50,7 +50,7 @@ export function SupplierForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-2">
+    <form onSubmit={onSubmit} className="space-y-4 pb-16">
       <Field label="Name">
         <input
           required
@@ -89,15 +89,15 @@ export function SupplierForm({
       <Field label="Notes">
         <textarea
           rows={2}
-          className={`${inputClass()} h-auto py-1.5`}
+          className={inputClass("h-auto min-h-11 py-2.5")}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Terms, contact"
         />
       </Field>
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <div className="sticky-save sticky z-20 -mx-2.5 border-t border-line bg-bg/95 px-2.5 py-1.5 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
-        <Button type="submit" className="w-full min-h-11" disabled={saving || !gstinOk}>
+      <div className="sticky-save sticky z-20 -mx-4 border-t border-line bg-bg/95 px-4 py-2.5 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+        <Button type="submit" className="w-full" disabled={saving || !gstinOk}>
           {saving ? "Saving…" : supplier ? "Update" : "Save"}
         </Button>
       </div>

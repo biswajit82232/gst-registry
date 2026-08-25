@@ -56,22 +56,22 @@ export function InstallCard() {
 
   if (standalone || installed) {
     return (
-      <div className="rounded-md border border-line bg-bg-elev px-2 py-1.5">
-        <p className="text-[13px] font-medium">Installed on this device</p>
-        <p className="text-[11px] text-muted">Bills stay on the phone if the network drops.</p>
+      <div>
+        <p className="text-[15px] font-medium">Installed on this device</p>
+        <p className="mt-1 text-[13px] text-muted">Bills stay on the phone if the network drops.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-1.5 rounded-md border border-line bg-bg-elev px-2 py-2">
-      <p className="text-[13px] font-medium">Install app</p>
+    <div className="space-y-2">
+      <p className="text-[15px] font-medium">Install app</p>
       {promptEvent ? (
         <>
-          <p className="text-[11px] text-muted">Add GST Registry to the home screen like a normal app.</p>
+          <p className="text-[13px] text-muted">Add GST Registry to the home screen like a normal app.</p>
           <Button
             type="button"
-            className="w-full min-h-11"
+            className="w-full"
             onClick={async () => {
               await promptEvent.prompt();
               const choice = await promptEvent.userChoice;
@@ -83,11 +83,11 @@ export function InstallCard() {
           </Button>
         </>
       ) : ios ? (
-        <p className="text-[11px] leading-snug text-muted">
+        <p className="text-[13px] leading-snug text-muted">
           Safari → Share → <span className="font-medium text-ink">Add to Home Screen</span>.
         </p>
       ) : (
-        <p className="text-[11px] leading-snug text-muted">
+        <p className="text-[13px] leading-snug text-muted">
           In Chrome, open the menu and choose <span className="font-medium text-ink">Install app</span> or{" "}
           <span className="font-medium text-ink">Add to Home screen</span>.
         </p>

@@ -19,17 +19,34 @@ export function Field({
 }) {
   const Tag = as;
   return (
-    <Tag className={cn("block space-y-0.5", className)}>
-      <span className="text-[11px] font-medium text-muted">{label}</span>
+    <Tag className={cn("block space-y-1.5", className)}>
+      <span className="text-[12px] text-muted">{label}</span>
       {children}
-      {hint ? <span className="block text-[10px] leading-tight text-muted">{hint}</span> : null}
+      {hint ? <span className="block text-[12px] leading-snug text-muted">{hint}</span> : null}
     </Tag>
+  );
+}
+
+export function Section({
+  title,
+  children,
+  className,
+}: {
+  title?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("space-y-3", className)}>
+      {title ? <h2 className="text-[12px] text-muted">{title}</h2> : null}
+      {children}
+    </section>
   );
 }
 
 export function inputClass(extra?: string) {
   return cn(
-    "field-input h-9 w-full rounded-md border border-line bg-bg-elev px-2.5 text-ink",
+    "field-input h-11 w-full rounded-md border border-line bg-bg-elev px-3 text-ink",
     "placeholder:text-muted/70 disabled:opacity-50",
     extra,
   );
@@ -46,20 +63,20 @@ export function Button({
   size?: "sm" | "md";
 }) {
   const styles = {
-    primary: "bg-teal-700 text-white dark:bg-teal-400 dark:text-teal-950 active:opacity-80",
+    primary: "bg-teal-800 text-white dark:bg-teal-400 dark:text-teal-950 active:opacity-80",
     ghost: "bg-transparent text-ink active:bg-line/60",
-    danger: "bg-rose-600 text-white active:bg-rose-700",
+    danger: "text-rose-700 dark:text-rose-300 active:bg-rose-50 dark:active:bg-rose-950/40",
     outline: "border border-line bg-bg-elev text-ink active:bg-line/40",
   } as const;
   const sizes = {
-    sm: "h-8 px-2.5 text-[12px]",
-    md: "h-9 px-3 text-[13px]",
+    sm: "h-10 px-3 text-[13px]",
+    md: "h-11 px-4 text-[14px]",
   } as const;
 
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-md font-semibold transition disabled:opacity-50",
+        "inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition disabled:opacity-50",
         styles[variant],
         sizes[size],
         className,
@@ -71,40 +88,69 @@ export function Button({
   );
 }
 
-export function StatStrip({
-  items,
+export function Segmented<T extends string | number>({
+  value,
+  onChange,
+  options,
+  ariaLabel,
 }: {
-  items: { label: string; value: string; accent?: boolean; href?: string }[];
+  value: T;
+  onChange: (next: T) => void;
+  options: { id: T; label: string; activeClass?: string }[];
+  ariaLabel?: string;
 }) {
   return (
-    <div
-      className="grid overflow-hidden rounded-md border border-line bg-bg-elev"
-      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
-    >
-      {items.map((item, i) => {
-        const inner = (
-          <>
-            <p className={cn("text-[9px] leading-none", item.accent ? "opacity-80" : "text-muted")}>
-              {item.label}
-            </p>
-            <p className="tabular mt-0.5 truncate text-[11px] font-semibold leading-tight">
-              {item.value}
-            </p>
-          </>
+    <div className="flex rounded-md bg-line/70 p-0.5 dark:bg-line/80" role="group" aria-label={ariaLabel}>
+      {options.map((item) => {
+        const active = value === item.id || (typeof value === "number" && Math.abs(Number(value) - Number(item.id)) < 0.001);
+        return (
+          <button
+            key={String(item.id)}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(item.id)}
+            className={cn(
+              "min-h-10 min-w-0 flex-1 rounded-[10px] px-1 text-[13px] font-medium",
+              active ? cn("bg-bg-elev text-ink shadow-sm", item.activeClass) : "text-muted",
+            )}
+          >
+            {item.label}
+          </button>
         );
-        const cls = cn(
-          "flex min-h-11 min-w-0 flex-col items-center justify-center px-1 py-1.5 text-center",
-          i > 0 && "border-l border-line",
-          item.accent && "bg-amber-400 text-amber-950 dark:bg-amber-400",
-        );
-        return item.href ? (
-          <Link key={item.label} href={item.href} className={cls} aria-label={`${item.label} ${item.value}`}>
-            {inner}
-          </Link>
-        ) : (
-          <div key={item.label} className={cls}>
-            {inner}
-          </div>
+      })}
+    </div>
+  );
+}
+
+export function UnderlineTabs<T extends string>({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+}: {
+  value: T;
+  onChange: (next: T) => void;
+  options: { id: T; label: string }[];
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="flex gap-5 overflow-x-auto overscroll-x-contain border-b border-line" role="tablist" aria-label={ariaLabel}>
+      {options.map((item) => {
+        const active = value === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(item.id)}
+            className={cn(
+              "-mb-px shrink-0 border-b-2 py-2.5 text-[13px]",
+              active ? "border-ink font-medium text-ink" : "border-transparent text-muted",
+            )}
+          >
+            {item.label}
+          </button>
         );
       })}
     </div>
@@ -121,9 +167,9 @@ export function Empty({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-dashed border-line px-3 py-5 text-center">
-      <p className="text-[13px] font-medium">{title}</p>
-      {hint ? <p className="mt-0.5 text-[11px] text-muted">{hint}</p> : null}
+    <div className="px-1 py-10 text-center">
+      <p className="text-[15px] font-medium">{title}</p>
+      {hint ? <p className="mt-1 text-[13px] text-muted">{hint}</p> : null}
       {children}
     </div>
   );
@@ -137,12 +183,12 @@ export function Alert({
   tone?: "warn" | "danger" | "muted";
 }) {
   const styles = {
-    warn: "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
-    danger: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200",
-    muted: "border-line bg-bg-elev text-muted",
+    warn: "text-amber-800 dark:text-amber-200",
+    danger: "text-rose-700 dark:text-rose-300",
+    muted: "text-muted",
   } as const;
   return (
-    <p className={cn("rounded-md border px-2 py-1.5 text-[11px] leading-snug", styles[tone])} role="status">
+    <p className={cn("text-[13px] leading-snug", styles[tone])} role="status">
       {children}
     </p>
   );
@@ -156,15 +202,31 @@ export function UndoBar({
   onUndo: () => void;
 }) {
   return (
-    <div className="flex min-h-10 items-center justify-between gap-2 rounded-md bg-ink px-2 py-1.5 text-[12px] text-bg-elev">
-      <span>{message}</span>
+    <div className="flex min-h-11 items-center justify-between gap-2 text-[13px]">
+      <span className="text-muted">{message}</span>
       <button
         type="button"
         onClick={onUndo}
-        className="min-h-8 min-w-11 font-semibold underline-offset-2 hover:underline"
+        className="min-h-10 font-medium text-ink underline-offset-2 hover:underline"
       >
         Undo
       </button>
     </div>
+  );
+}
+
+export function TextLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link href={href} className={cn("text-[13px] font-medium text-ink underline-offset-2 hover:underline", className)}>
+      {children}
+    </Link>
   );
 }

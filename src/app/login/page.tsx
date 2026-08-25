@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Stamp } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SetupScreen } from "@/components/setup-screen";
 import { Alert, Button, Field, inputClass } from "@/components/ui";
@@ -18,20 +17,13 @@ export default function LoginPage() {
 
   return (
     <div className="safe-x flex min-h-dvh flex-col bg-bg pb-[max(2.5rem,env(safe-area-inset-bottom,0px))]">
-      <div className="safe-top flex justify-end py-1">
+      <div className="safe-top flex justify-end">
         <ThemeToggle />
       </div>
-      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white dark:bg-teal-400 dark:text-teal-950">
-            <Stamp className="h-4 w-4" />
-          </span>
-          <div>
-            <h1 className="text-[17px] font-bold leading-tight">GST Registry</h1>
-            <p className="text-[12px] text-muted">GST purchase register</p>
-          </div>
-        </div>
-        <form action={action} className="space-y-2 rounded-lg border border-line bg-bg-elev p-3">
+      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
+        <p className="text-[12px] text-muted">GST purchase register</p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-tight">GST Registry</h1>
+        <form action={action} className="mt-8 space-y-4">
           <input type="hidden" name="mode" value={mode} />
           <Field label="Email">
             <input
@@ -55,14 +47,14 @@ export default function LoginPage() {
             />
           </Field>
           {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
-          {state.info ? <p className="text-[12px] text-muted">{state.info}</p> : null}
-          <Button type="submit" className="w-full min-h-11" disabled={pending}>
+          {state.info ? <p className="text-[13px] text-muted">{state.info}</p> : null}
+          <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Please wait…" : mode === "in" ? "Sign in" : "Create account"}
           </Button>
         </form>
         <button
           type="button"
-          className="mt-3 min-h-10 text-[12px] text-muted"
+          className="mt-6 min-h-11 text-[13px] text-muted"
           onClick={() => setMode(mode === "in" ? "up" : "in")}
         >
           {mode === "in" ? "New here? Create an account" : "Already registered? Sign in"}

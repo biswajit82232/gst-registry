@@ -61,9 +61,9 @@ export default function PurchaseDetailPage() {
 
   if (!purchase) {
     return (
-      <p className="text-[13px] text-muted">
+      <p className="text-[15px] text-muted">
         Bill not found.{" "}
-        <Link href="/" className="text-teal-700 dark:text-teal-300">
+        <Link href="/" className="font-medium text-ink">
           Back
         </Link>
       </p>
@@ -73,7 +73,7 @@ export default function PurchaseDetailPage() {
   if (editing) {
     return (
       <div>
-        <button type="button" className="mb-2 min-h-10 text-[13px] text-muted" onClick={() => setEditing(false)}>
+        <button type="button" className="mb-4 min-h-11 text-[13px] text-muted" onClick={() => setEditing(false)}>
           Cancel
         </button>
         <PurchaseForm profile={profile} purchase={purchase} onSaved={() => setEditing(false)} />
@@ -84,28 +84,28 @@ export default function PurchaseDetailPage() {
   const gst = gstOf(purchase);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-2">
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[12px] text-muted">
+          <p className="text-[13px] text-muted">
             {formatDate(purchase.invoice_date)}
             {purchase.invoice_number.trim() ? ` · ${purchase.invoice_number}` : ""}
           </p>
           {party ? (
-            <Link href={`/suppliers/${party.id}`} className="block truncate text-[17px] font-semibold leading-tight">
+            <Link href={`/suppliers/${party.id}`} className="mt-1 block truncate text-[20px] font-semibold tracking-tight">
               {purchase.supplier_name}
             </Link>
           ) : (
-            <p className="truncate text-[17px] font-semibold leading-tight">{purchase.supplier_name}</p>
+            <p className="mt-1 truncate text-[20px] font-semibold tracking-tight">{purchase.supplier_name}</p>
           )}
         </div>
-        <p className="tabular shrink-0 text-[17px] font-bold">{formatInr(purchase.invoice_total)}</p>
+        <p className="tabular shrink-0 text-[20px] font-semibold tracking-tight">{formatInr(purchase.invoice_total)}</p>
       </div>
 
       {filled.length > 1 ? (
-        <ul className="divide-y divide-line overflow-hidden rounded-md border border-line bg-bg-elev text-[13px]">
+        <ul className="divide-y divide-line text-[14px]">
           {filled.map((line, i) => (
-            <li key={i} className="flex items-baseline justify-between gap-2 px-2.5 py-1.5">
+            <li key={i} className="flex items-baseline justify-between gap-3 py-2.5">
               <span className="text-muted">
                 {formatInr(line.taxable)} · {line.rate}%
               </span>
@@ -116,17 +116,17 @@ export default function PurchaseDetailPage() {
           ))}
         </ul>
       ) : gst > 0 ? (
-        <p className="text-[13px] text-muted">GST {formatInr(gst)}</p>
+        <p className="text-[14px] text-muted">GST {formatInr(gst)}</p>
       ) : null}
 
       <StatusPicker value={purchase.input_status} onChange={(status) => !busy && void mark(status)} />
       {hint ? <Alert tone="danger">{hint}</Alert> : null}
 
-      <div className="flex gap-1.5">
-        <Button className="min-h-11 flex-1" onClick={() => setEditing(true)} disabled={busy}>
+      <div className="flex gap-2">
+        <Button className="flex-1" onClick={() => setEditing(true)} disabled={busy}>
           Edit
         </Button>
-        <Button variant="danger" className="min-h-11" onClick={remove} disabled={busy}>
+        <Button variant="danger" onClick={remove} disabled={busy}>
           Delete
         </Button>
       </div>

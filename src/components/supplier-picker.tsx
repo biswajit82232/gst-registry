@@ -102,22 +102,22 @@ export function SupplierPicker({
       {showList ? (
         <ul
           role="listbox"
-          className="absolute z-20 mt-0.5 max-h-44 w-full overflow-auto rounded-md border border-line bg-bg-elev py-0.5 shadow-lg"
+        className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-md border border-line bg-bg-elev py-1 shadow-lg"
         >
           {matches.map((s) => (
             <li key={s.id} role="option">
               <button
                 type="button"
-                className="flex min-h-11 w-full flex-col items-start px-2 py-1.5 text-left active:bg-line/50"
+                className="flex min-h-12 w-full flex-col items-start px-3 py-2 text-left active:bg-line/40"
                 onClick={() => pick(s)}
               >
-                <span className="text-[13px] font-medium">{s.name}</span>
-                <span className="text-[10px] text-muted">{s.gstin || "No GSTIN"}</span>
+                <span className="text-[15px] font-medium">{s.name}</span>
+                <span className="text-[12px] text-muted">{s.gstin || "No GSTIN"}</span>
               </button>
             </li>
           ))}
           {q && !exact ? (
-            <li className="border-t border-line px-2 py-1.5 text-[11px] text-muted">
+            <li className="border-t border-line px-3 py-2 text-[12px] text-muted">
               New party · saved with this bill
             </li>
           ) : null}

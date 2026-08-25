@@ -29,18 +29,18 @@ export default function SuppliersPage() {
   }, [purchases, q, suppliers]);
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-1.5">
+    <div className="space-y-5">
+      <div className="flex gap-2">
         <input
           className={inputClass("flex-1")}
-          placeholder="Search parties"
+          placeholder="Search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
         />
         <Link
           href="/suppliers/new"
-          className="inline-flex h-9 shrink-0 items-center rounded-md bg-teal-700 px-3 text-[13px] font-semibold text-white dark:bg-teal-400 dark:text-teal-950"
+          className="inline-flex h-11 shrink-0 items-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
         >
           Add
         </Link>
@@ -52,29 +52,29 @@ export default function SuppliersPage() {
 
       {rows.length === 0 ? (
         <Empty title={q ? "No match" : "No parties yet"} hint="Save a bill — new names are stored here.">
-          <Link href="/purchases/new" className="mt-2 inline-block text-[13px] font-medium text-teal-700 dark:text-teal-300">
+          <Link href="/purchases/new" className="mt-4 inline-block text-[14px] font-medium text-ink">
             Add a bill
           </Link>
         </Empty>
       ) : (
-        <div className="divide-y divide-line overflow-hidden rounded-md border border-line bg-bg-elev">
+        <div className="divide-y divide-line">
           {rows.map(({ supplier, bills, totals }) => (
             <Link
               key={supplier.id}
               href={`/suppliers/${supplier.id}`}
               prefetch
-              className="flex items-center justify-between gap-2 px-2.5 py-2"
+              className="flex items-center justify-between gap-3 py-3.5"
             >
               <div className="min-w-0">
-                <p className="truncate text-[14px] font-semibold leading-tight">{supplier.name}</p>
-                <p className="truncate text-[11px] text-muted">
+                <p className="truncate text-[16px] font-medium leading-tight">{supplier.name}</p>
+                <p className="mt-1 truncate text-[13px] text-muted">
                   {supplier.gstin || "No GSTIN"}
                   {bills.length ? ` · ${bills.length} bill${bills.length === 1 ? "" : "s"}` : ""}
                 </p>
               </div>
-              <p className="tabular shrink-0 text-[13px] font-medium">
-                {totals.gst > 0 ? formatCompact(totals.gst) : bills.length ? "—" : ""}
-              </p>
+              {totals.gst > 0 ? (
+                <p className="tabular shrink-0 text-[14px] text-muted">{formatCompact(totals.gst)}</p>
+              ) : null}
             </Link>
           ))}
         </div>

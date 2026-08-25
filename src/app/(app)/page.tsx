@@ -5,7 +5,7 @@ import Link from "next/link";
 import { MonthBar } from "@/components/month-bar";
 import { PurchaseCard, PurchaseList, ShowMore } from "@/components/purchase-card";
 import { useWindowed } from "@/components/use-windowed";
-import { Alert, Empty, StatStrip, UndoBar } from "@/components/ui";
+import { Alert, Empty, UnderlineTabs, UndoBar } from "@/components/ui";
 import { formatCompact, monthRange } from "@/lib/format";
 import { totalsOf } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
@@ -44,41 +44,27 @@ export default function HomePage() {
     }
   }
 
-  const chips: { id: Filter; label: string }[] = [
-    { id: "waiting", label: `Wait ${totals.waitingCount}` },
-    { id: "got", label: `Got ${totals.gotCount}` },
-    { id: "missing", label: "No" },
-    { id: "all", label: "All" },
-  ];
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-5">
       <MonthBar month={month} onChange={setMonth} />
-      <StatStrip
-        items={[
-          { label: "Wait", value: formatCompact(totals.waitingGst), accent: totals.waitingGst > 0 },
-          { label: "Got", value: formatCompact(totals.gotGst) },
-          { label: "Bills", value: String(totals.count) },
+      <p className="tabular text-[13px] text-muted">
+        Waiting {formatCompact(totals.waitingGst)}
+        <span className="mx-1.5 text-line">·</span>
+        Got {formatCompact(totals.gotGst)}
+        <span className="mx-1.5 text-line">·</span>
+        {totals.count} {totals.count === 1 ? "bill" : "bills"}
+      </p>
+      <UnderlineTabs
+        value={filter}
+        onChange={setFilter}
+        ariaLabel="Filter"
+        options={[
+          { id: "waiting", label: `Waiting ${totals.waitingCount}` },
+          { id: "got", label: `Got ${totals.gotCount}` },
+          { id: "missing", label: "No" },
+          { id: "all", label: "All" },
         ]}
       />
-      <div className="flex gap-1 overflow-x-auto overscroll-x-contain" role="tablist" aria-label="Filter">
-        {chips.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            role="tab"
-            aria-selected={filter === chip.id}
-            onClick={() => setFilter(chip.id)}
-            className={`h-8 min-h-8 shrink-0 rounded-full px-2.5 text-[12px] font-medium ${
-              filter === chip.id
-                ? "bg-teal-700 text-white dark:bg-teal-400 dark:text-teal-950"
-                : "border border-line bg-bg-elev"
-            }`}
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
       {hint || syncError ? <Alert tone="danger">{hint || syncError}</Alert> : null}
       {undoId ? (
         <UndoBar
@@ -97,7 +83,7 @@ export default function HomePage() {
           {rows.length === 0 ? (
             <Link
               href="/purchases/new"
-              className="mt-2 inline-flex h-10 min-h-10 items-center rounded-md bg-teal-700 px-3 text-[13px] font-semibold text-white dark:bg-teal-400 dark:text-teal-950"
+              className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
             >
               Add bill
             </Link>

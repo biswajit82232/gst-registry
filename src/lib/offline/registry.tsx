@@ -626,18 +626,18 @@ function BootScreen({
         <p className="text-[15px] font-semibold" aria-live="polite">
           {firstDownload ? "Downloading register" : "Opening"}
         </p>
-        <p className="mt-1 text-[12px] text-muted">
+        <p className="mt-2 text-[13px] text-muted">
           {firstDownload
             ? "Once on this device. After that, bills open instantly."
             : "Reading the copy on this device."}
         </p>
         {error ? (
-          <div className="mt-3 space-y-2">
-            <p className="text-[12px] text-rose-700 dark:text-rose-300">{error}</p>
+          <div className="mt-4 space-y-3">
+            <p className="text-[13px] text-rose-700 dark:text-rose-300">{error}</p>
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-[13px] font-semibold text-white dark:bg-teal-400 dark:text-teal-950"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
             >
               Retry
             </button>

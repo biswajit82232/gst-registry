@@ -13,8 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait-primary",
     lang: "en",
     dir: "ltr",
-    theme_color: "#0f766e",
-    background_color: "#0b0e0d",
+    theme_color: "#f7f6f3",
+    background_color: "#f7f6f3",
     categories: ["finance", "business", "productivity"],
     icons: [
       {

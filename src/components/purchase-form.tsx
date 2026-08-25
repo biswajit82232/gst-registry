@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   applyLinesToInput,
   decodeLines,
+  DEFAULT_GST_RATE,
   emptyPurchase,
   GST_RATES,
   isValidGstin,
   lineGst,
   lineTotal,
+  nextUnusedRate,
   toNumber,
   totalsFromLines,
   type BillLine,
@@ -18,7 +20,7 @@ import { formatInr, todayIso } from "@/lib/format";
 import { useRegistry } from "@/lib/offline/registry";
 import type { InputStatus, Profile, Purchase, PurchaseInput } from "@/lib/types";
 import { SupplierPicker } from "./supplier-picker";
-import { Alert, Button, Field, inputClass } from "./ui";
+import { Alert, Button, Field, inputClass, Section, Segmented } from "./ui";
 
 function fromPurchase(p: Purchase): PurchaseInput {
   return {
@@ -49,10 +51,10 @@ function fromPurchase(p: Purchase): PurchaseInput {
   };
 }
 
-const STATUSES: { id: InputStatus; label: string }[] = [
+const STATUSES: { id: InputStatus; label: string; activeClass?: string }[] = [
   { id: "waiting", label: "Wait" },
-  { id: "got", label: "Got" },
-  { id: "missing", label: "No" },
+  { id: "got", label: "Got", activeClass: "text-emerald-700 dark:text-emerald-300" },
+  { id: "missing", label: "No", activeClass: "text-rose-700 dark:text-rose-300" },
 ];
 
 export function StatusPicker({
@@ -62,27 +64,7 @@ export function StatusPicker({
   value: InputStatus;
   onChange: (next: InputStatus) => void;
 }) {
-  return (
-    <div className="grid grid-cols-3 gap-1" role="group" aria-label="GST input">
-      {STATUSES.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          aria-pressed={value === item.id}
-          onClick={() => onChange(item.id)}
-          className={`h-10 rounded-md text-[13px] font-semibold ${
-            value === item.id
-              ? item.id === "missing"
-                ? "bg-rose-600 text-white"
-                : "bg-teal-700 text-white dark:bg-teal-400 dark:text-teal-950"
-              : "border border-line bg-bg-elev"
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented value={value} onChange={onChange} options={STATUSES} ariaLabel="GST input" />;
 }
 
 export function PurchaseForm({
@@ -104,7 +86,7 @@ export function PurchaseForm({
     purchase ? fromPurchase(purchase) : emptyPurchase(profile?.gstin),
   );
   const [lines, setLines] = useState<BillLine[]>(() =>
-    purchase ? decodeLines(purchase) : [{ taxable: 0, rate: 18 }],
+    purchase ? decodeLines(purchase) : [{ taxable: 0, rate: DEFAULT_GST_RATE }],
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -182,7 +164,7 @@ export function PurchaseForm({
         supplier_gstin: party.gstin ?? "",
         input_status: "waiting",
       });
-      setLines([{ taxable: 0, rate: 18 }]);
+      setLines([{ taxable: 0, rate: DEFAULT_GST_RATE }]);
       setSavedNote("Saved. Add the next bill.");
       requestAnimationFrame(() => amountRef.current?.focus());
     } catch (err) {
@@ -193,160 +175,143 @@ export function PurchaseForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-2.5 pb-14">
-      <div className="grid grid-cols-2 gap-1.5">
-        <Field label="Date">
-          <input
-            type="date"
-            required
-            className={inputClass()}
-            value={form.invoice_date}
-            onChange={(e) => setForm((f) => ({ ...f, invoice_date: e.target.value }))}
-          />
-        </Field>
-        <Field label="Invoice">
-          <input
-            className={inputClass()}
-            placeholder="Optional"
-            enterKeyHint="next"
-            value={form.invoice_number}
-            onChange={(e) => setForm((f) => ({ ...f, invoice_number: e.target.value }))}
-          />
-        </Field>
-      </div>
-
-      <Field label="Party" as="div">
-        <SupplierPicker
-          suppliers={suppliers}
-          name={form.supplier_name}
-          gstin={gstin}
-          ownGstin={profile?.gstin}
-          inputRef={partyRef}
-          autoFocus={!purchase && !supplierId}
-          onChange={(next) =>
-            setForm((f) => ({
-              ...f,
-              supplier_name: next.supplier_name,
-              supplier_id: next.supplier_id,
-              supplier_gstin:
-                next.supplier_gstin !== undefined ? next.supplier_gstin : f.supplier_gstin,
-              tax_type: next.tax_type ?? f.tax_type,
-              place_of_supply: next.place_of_supply ?? f.place_of_supply,
-            }))
-          }
-        />
-      </Field>
-
-      <Field
-        label="GSTIN"
-        hint={gstin && gstinOk ? "Saved with this party" : "Optional"}
-      >
-        <input
-          className={inputClass(!gstinOk ? "border-rose-400" : undefined)}
-          maxLength={15}
-          autoCapitalize="characters"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="If the party has one"
-          value={gstin}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, supplier_gstin: e.target.value.toUpperCase(), supplier_id: f.supplier_id }))
-          }
-        />
-      </Field>
-
-      <div className="space-y-1.5">
-        <div className="flex items-baseline justify-between">
-          <p className="text-[11px] font-medium text-muted">Items</p>
-          <p className="text-[11px] text-muted">Taxable + GST %</p>
+    <form onSubmit={onSubmit} className="space-y-8 pb-16">
+      <Section title="Bill">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date">
+            <input
+              type="date"
+              required
+              className={inputClass()}
+              value={form.invoice_date}
+              onChange={(e) => setForm((f) => ({ ...f, invoice_date: e.target.value }))}
+            />
+          </Field>
+          <Field label="Invoice">
+            <input
+              className={inputClass()}
+              placeholder="Optional"
+              enterKeyHint="next"
+              value={form.invoice_number}
+              onChange={(e) => setForm((f) => ({ ...f, invoice_number: e.target.value }))}
+            />
+          </Field>
         </div>
-        {lines.map((line, index) => (
-          <div key={index} className="rounded-md border border-line bg-bg-elev p-1.5">
-            <div className="flex items-center gap-1.5">
-              <input
-                ref={index === 0 ? amountRef : undefined}
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                className={inputClass("tabular min-w-0 flex-1")}
-                placeholder="Amount"
-                value={line.taxable || ""}
-                onChange={(e) => setLine(index, { taxable: Number(e.target.value) })}
+      </Section>
+
+      <Section title="Party">
+        <Field label="Name" as="div">
+          <SupplierPicker
+            suppliers={suppliers}
+            name={form.supplier_name}
+            gstin={gstin}
+            ownGstin={profile?.gstin}
+            inputRef={partyRef}
+            autoFocus={!purchase && !supplierId}
+            onChange={(next) =>
+              setForm((f) => ({
+                ...f,
+                supplier_name: next.supplier_name,
+                supplier_id: next.supplier_id,
+                supplier_gstin:
+                  next.supplier_gstin !== undefined ? next.supplier_gstin : f.supplier_gstin,
+                tax_type: next.tax_type ?? f.tax_type,
+                place_of_supply: next.place_of_supply ?? f.place_of_supply,
+              }))
+            }
+          />
+        </Field>
+        <Field label="GSTIN" hint={gstin && gstinOk ? "Saved with this party" : "Optional"}>
+          <input
+            className={inputClass(!gstinOk ? "border-rose-400" : undefined)}
+            maxLength={15}
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="If the party has one"
+            value={gstin}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, supplier_gstin: e.target.value.toUpperCase(), supplier_id: f.supplier_id }))
+            }
+          />
+        </Field>
+      </Section>
+
+      <Section title="Items">
+        <div className="space-y-5">
+          {lines.map((line, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={index === 0 ? amountRef : undefined}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  inputMode="decimal"
+                  className={inputClass("tabular min-w-0 flex-1")}
+                  placeholder="Taxable amount"
+                  value={line.taxable || ""}
+                  onChange={(e) => setLine(index, { taxable: Number(e.target.value) })}
+                />
+                {lines.length > 1 ? (
+                  <button
+                    type="button"
+                    aria-label="Remove item"
+                    className="h-11 w-11 shrink-0 text-[18px] text-muted"
+                    onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              <Segmented
+                value={
+                  GST_RATES.find((rate) => Math.abs(line.rate - rate) < 0.001) ?? line.rate
+                }
+                onChange={(rate) => setLine(index, { rate: Number(rate) })}
+                options={GST_RATES.map((rate) => ({ id: rate, label: `${rate}%` }))}
+                ariaLabel={`GST rate for item ${index + 1}`}
               />
-              {lines.length > 1 ? (
-                <button
-                  type="button"
-                  aria-label="Remove item"
-                  className="h-9 w-9 shrink-0 rounded-md text-[16px] text-muted"
-                  onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))}
-                >
-                  ×
-                </button>
+              {toNumber(line.taxable) > 0 ? (
+                <p className="text-[13px] text-muted">
+                  GST {formatInr(lineGst(line))} · Total {formatInr(lineTotal(line))}
+                </p>
               ) : null}
             </div>
-            <div className="mt-1.5 flex gap-0.5">
-              {GST_RATES.map((rate) => (
-                <button
-                  key={rate}
-                  type="button"
-                  aria-pressed={Math.abs(line.rate - rate) < 0.001}
-                  onClick={() => setLine(index, { rate })}
-                  className={`h-8 min-w-0 flex-1 rounded-md text-[12px] font-semibold ${
-                    Math.abs(line.rate - rate) < 0.001
-                      ? "bg-teal-700 text-white dark:bg-teal-400 dark:text-teal-950"
-                      : "border border-line bg-bg"
-                  }`}
-                >
-                  {rate}%
-                </button>
-              ))}
-            </div>
-            {toNumber(line.taxable) > 0 ? (
-              <p className="mt-1 text-[11px] text-muted">
-                GST {formatInr(lineGst(line))} · Total {formatInr(lineTotal(line))}
-              </p>
-            ) : null}
-          </div>
-        ))}
-        <button
-          type="button"
-          className="min-h-9 w-full rounded-md border border-dashed border-line text-[12px] font-medium text-teal-700 dark:text-teal-300"
-          onClick={() =>
-            setLines((prev) => {
-              const used = new Set(prev.map((line) => line.rate));
-              const rate = GST_RATES.find((item) => !used.has(item)) ?? 18;
-              return [...prev, { taxable: 0, rate }];
-            })
-          }
-        >
-          + Add different GST %
-        </button>
-      </div>
-
-      {totals.invoice_total > 0 ? (
-        <div className="flex items-baseline justify-between rounded-md border border-line bg-bg-elev px-2.5 py-2">
-          <p className="text-[12px] text-muted">
-            GST {formatInr(totals.gst)}
-            {lines.filter((line) => toNumber(line.taxable) > 0).length > 1 ? " · mixed rates" : ""}
-          </p>
-          <p className="tabular text-[15px] font-semibold">{formatInr(totals.invoice_total)}</p>
+          ))}
+          <button
+            type="button"
+            className="min-h-11 text-[13px] font-medium text-ink"
+            onClick={() =>
+              setLines((prev) => [...prev, { taxable: 0, rate: nextUnusedRate(prev.map((line) => line.rate)) }])
+            }
+          >
+            Add rate
+          </button>
         </div>
-      ) : null}
+        {totals.invoice_total > 0 ? (
+          <div className="flex items-baseline justify-between pt-1">
+            <p className="text-[13px] text-muted">
+              GST {formatInr(totals.gst)}
+              {lines.filter((line) => toNumber(line.taxable) > 0).length > 1 ? " · mixed rates" : ""}
+            </p>
+            <p className="tabular text-[20px] font-semibold tracking-tight">{formatInr(totals.invoice_total)}</p>
+          </div>
+        ) : null}
+      </Section>
 
-      <div>
-        <p className="mb-1 text-[11px] font-medium text-muted">GST input</p>
+      <Section title="Input">
         <StatusPicker
           value={form.input_status}
           onChange={(input_status) => setForm((f) => ({ ...f, input_status }))}
         />
-      </div>
+      </Section>
 
       {savedNote ? <Alert tone="muted">{savedNote}</Alert> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="sticky-save sticky z-20 -mx-2.5 border-t border-line bg-bg/95 px-2.5 py-1.5 backdrop-blur md:bottom-0 md:mx-0 md:px-0">
-        <Button type="submit" className="w-full min-h-11" disabled={saving || !gstinOk}>
+      <div className="sticky-save sticky z-20 -mx-4 border-t border-line bg-bg/95 px-4 py-2.5 backdrop-blur md:bottom-0 md:mx-0 md:px-0">
+        <Button type="submit" className="w-full" disabled={saving || !gstinOk}>
           {saving ? "Saving…" : purchase ? "Update" : "Save"}
         </Button>
       </div>

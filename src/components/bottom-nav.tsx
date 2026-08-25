@@ -7,7 +7,7 @@ import { cn } from "./ui";
 
 const items = [
   { href: "/", label: "Register", icon: Home },
-  { href: "/purchases/new", label: "Add", icon: Plus },
+  { href: "/purchases/new", label: "Add", icon: Plus, primary: true },
   { href: "/suppliers", label: "Parties", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
@@ -18,7 +18,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg-elev/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
+      className="bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
     >
       <ul className="grid grid-cols-4">
         {items.map((item) => {
@@ -34,11 +34,14 @@ export function BottomNav() {
                 prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 flex-col items-center justify-center gap-0 py-1 text-[11px] font-medium",
-                  active ? "text-teal-700 dark:text-teal-300" : "text-muted",
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px]",
+                  active ? "font-medium text-ink" : "text-muted",
                 )}
               >
-                <Icon className="h-4 w-4" strokeWidth={active ? 2.4 : 1.8} />
+                <Icon
+                  className={cn("h-[18px] w-[18px]", item.primary && !active && "text-teal-800 dark:text-teal-300")}
+                  strokeWidth={active || item.primary ? 2.2 : 1.7}
+                />
                 {item.label}
               </Link>
             </li>

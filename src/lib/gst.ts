@@ -1,6 +1,15 @@
 import type { Purchase, PurchaseInput, PurchaseTotals, TaxType } from "./types";
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
+export const DEFAULT_GST_RATE = 5;
+
+export function nextUnusedRate(used: Iterable<number>): number {
+  const set = new Set(used);
+  for (const rate of [5, 12, 18, 28, 0] as const) {
+    if (![...set].some((value) => Math.abs(value - rate) < 0.001)) return rate;
+  }
+  return DEFAULT_GST_RATE;
+}
 
 export type BillLine = { taxable: number; rate: number };
 
@@ -260,7 +269,7 @@ export function fromInvoiceTotal(input: {
 export function emptyPurchase(ownGstin?: string | null): PurchaseInput {
   const today = new Date();
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const tax = calcGst({ taxableValue: 0, gstRate: 18, taxType: "intra" });
+  const tax = calcGst({ taxableValue: 0, gstRate: DEFAULT_GST_RATE, taxType: "intra" });
 
   return {
     invoice_date: iso,
@@ -270,7 +279,7 @@ export function emptyPurchase(ownGstin?: string | null): PurchaseInput {
     purchased_by: "",
     category: "goods",
     hsn_sac: "",
-    gst_rate: 18,
+    gst_rate: DEFAULT_GST_RATE,
     tax_type: detectTaxType("", ownGstin),
     itc_eligible: true,
     reverse_charge: false,

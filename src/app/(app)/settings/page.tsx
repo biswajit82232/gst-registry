@@ -36,8 +36,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-3">
-      <form onSubmit={save} className="space-y-2">
+    <div className="space-y-8">
+      <form onSubmit={save} className="space-y-4">
         <Field label="Business name">
           <input
             className={inputClass()}
@@ -47,24 +47,24 @@ export default function SettingsPage() {
             autoComplete="organization"
           />
         </Field>
-        <p className="text-[12px] text-muted">{profile?.email || userEmail}</p>
+        <p className="text-[13px] text-muted">{profile?.email || userEmail}</p>
         {status ? <Alert tone={status === "Saved." ? "muted" : "danger"}>{status}</Alert> : null}
-        <Button type="submit" className="w-full min-h-11" disabled={saving}>
+        <Button type="submit" className="w-full" disabled={saving}>
           {saving ? "Saving…" : "Save"}
         </Button>
       </form>
 
       <InstallCard />
 
-      <div className="flex items-center justify-between rounded-md border border-line bg-bg-elev px-2 py-1.5">
+      <div className="flex items-center justify-between py-1">
         <div>
-          <p className="text-[13px] font-medium">Appearance</p>
-          <p className="text-[12px] text-muted">Light or dark</p>
+          <p className="text-[15px] font-medium">Appearance</p>
+          <p className="text-[13px] text-muted">Light or dark</p>
         </div>
         <ThemeToggle />
       </div>
 
-      <Button variant="outline" className="w-full min-h-11" type="button" onClick={() => void onSignOut()}>
+      <Button variant="ghost" className="w-full text-muted" type="button" onClick={() => void onSignOut()}>
         Sign out
       </Button>
     </div>
