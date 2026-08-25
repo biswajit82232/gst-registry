@@ -23,6 +23,17 @@ export function lineTotal(line: BillLine): number {
   return round2(toNumber(line.taxable) + lineGst(line));
 }
 
+export function taxableFromInclusive(inclusive: number, rate: number): number {
+  const factor = 1 + toNumber(rate) / 100;
+  if (factor <= 0) return 0;
+  return round2(Math.max(0, toNumber(inclusive) / factor));
+}
+
+export function lineFromInclusive(inclusive: number, rate: number): BillLine {
+  const r = toNumber(rate);
+  return { taxable: taxableFromInclusive(inclusive, r), rate: r };
+}
+
 function parseRate(value: unknown): number {
   if (value == null || value === "") return 18;
   const n = toNumber(value);

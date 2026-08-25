@@ -9,6 +9,7 @@ import {
   emptyPurchase,
   GST_RATES,
   isValidGstin,
+  lineFromInclusive,
   lineGst,
   lineTotal,
   nextUnusedRate,
@@ -112,8 +113,21 @@ export function PurchaseForm({
     );
   }, [purchase, supplierId, suppliers]);
 
-  function setLine(index: number, patch: Partial<BillLine>) {
-    setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  function setInclusive(index: number, inclusive: number) {
+    setLines((prev) =>
+      prev.map((line, i) => (i === index ? lineFromInclusive(inclusive, line.rate) : line)),
+    );
+  }
+
+  function setRateKeepInclusive(index: number, rate: number) {
+    setLines((prev) =>
+      prev.map((line, i) => {
+        if (i !== index) return line;
+        const inclusive = lineTotal(line);
+        if (inclusive <= 0) return { ...line, rate };
+        return lineFromInclusive(inclusive, rate);
+      }),
+    );
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -239,46 +253,50 @@ export function PurchaseForm({
 
       <Section title="Items">
         <div className="space-y-5">
-          {lines.map((line, index) => (
-            <div key={index} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={index === 0 ? amountRef : undefined}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  className={inputClass("tabular min-w-0 flex-1")}
-                  placeholder="Taxable amount"
-                  value={line.taxable || ""}
-                  onChange={(e) => setLine(index, { taxable: Number(e.target.value) })}
+          {lines.map((line, index) => {
+            const inclusive = lineTotal(line);
+            return (
+              <div key={index} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={index === 0 ? amountRef : undefined}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    className={inputClass("tabular min-w-0 flex-1")}
+                    placeholder="Amount with GST"
+                    aria-label={`Amount with GST for item ${index + 1}`}
+                    value={inclusive || ""}
+                    onChange={(e) => setInclusive(index, Number(e.target.value))}
+                  />
+                  {lines.length > 1 ? (
+                    <button
+                      type="button"
+                      aria-label="Remove item"
+                      className="h-11 w-11 shrink-0 text-[18px] text-muted active:opacity-60"
+                      onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+                <Segmented
+                  value={
+                    GST_RATES.find((rate) => Math.abs(line.rate - rate) < 0.001) ?? line.rate
+                  }
+                  onChange={(rate) => setRateKeepInclusive(index, Number(rate))}
+                  options={GST_RATES.map((rate) => ({ id: rate, label: `${rate}%` }))}
+                  ariaLabel={`GST rate for item ${index + 1}`}
                 />
-                {lines.length > 1 ? (
-                  <button
-                    type="button"
-                    aria-label="Remove item"
-                    className="h-11 w-11 shrink-0 text-[18px] text-muted active:opacity-60"
-                    onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))}
-                  >
-                    ×
-                  </button>
+                {toNumber(line.taxable) > 0 ? (
+                  <p className="text-[13px] text-muted">
+                    GST {formatInr(lineGst(line))} · before GST {formatInr(toNumber(line.taxable))}
+                  </p>
                 ) : null}
               </div>
-              <Segmented
-                value={
-                  GST_RATES.find((rate) => Math.abs(line.rate - rate) < 0.001) ?? line.rate
-                }
-                onChange={(rate) => setLine(index, { rate: Number(rate) })}
-                options={GST_RATES.map((rate) => ({ id: rate, label: `${rate}%` }))}
-                ariaLabel={`GST rate for item ${index + 1}`}
-              />
-              {toNumber(line.taxable) > 0 ? (
-                <p className="text-[13px] text-muted">
-                  GST {formatInr(lineGst(line))} · Total {formatInr(lineTotal(line))}
-                </p>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
           <button
             type="button"
             className="min-h-11 text-[13px] font-medium text-ink active:opacity-60"
