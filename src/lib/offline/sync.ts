@@ -28,10 +28,8 @@ export function isInputStatusSchemaError(message: string): boolean {
 
 export function isClockSkewError(message: string): boolean {
   const m = message.toLowerCase();
-  return (
-    /used before issued|issued at future|iat.*future|token.*not yet valid|not valid yet/.test(m) ||
-    ((m.includes("jwt") || m.includes("token")) && m.includes("future"))
-  );
+  if (!/future|used before issued|not yet valid|not valid yet/.test(m)) return false;
+  return /jwt|token|claim|iat|nbf|jws|session|auth/.test(m);
 }
 
 export function isTransientError(message: string): boolean {

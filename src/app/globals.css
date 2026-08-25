@@ -167,7 +167,10 @@ button,
 .swipe-pane a,
 .swipe-pane button,
 .swipe-pane [role="button"],
-.swipe-pane [role="tab"] {
+.swipe-pane [role="tab"],
+.list-row,
+.list-row a,
+.list-row button {
   touch-action: pan-y;
 }
 

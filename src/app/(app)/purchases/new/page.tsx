@@ -13,7 +13,7 @@ function NewBill() {
 
 export default function NewPurchasePage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="h-24 rounded-md bg-line/40" aria-hidden="true" />}>
       <NewBill />
     </Suspense>
   );

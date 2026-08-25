@@ -229,6 +229,7 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
         queuedRef.current = true;
         return;
       }
+      lastFailRef.current = "none";
       const show = firstDownloadRef.current || pendingRef.current > 0;
       syncingRef.current = true;
       if (show) setSyncing(true);

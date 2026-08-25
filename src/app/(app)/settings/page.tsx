@@ -66,14 +66,11 @@ export default function SettingsPage() {
         <ThemeToggle />
       </div>
 
-      <Button
-        variant="ghost"
-        className="w-full border-t border-line pt-6 text-muted"
-        type="button"
-        onClick={() => void onSignOut()}
-      >
-        Sign out
-      </Button>
+      <div className="border-t border-line pt-6">
+        <Button variant="ghost" className="w-full text-muted" type="button" onClick={() => void onSignOut()}>
+          Sign out
+        </Button>
+      </div>
     </div>
   );
 }
