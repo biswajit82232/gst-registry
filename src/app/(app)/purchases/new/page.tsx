@@ -1,9 +1,20 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { PurchaseForm } from "@/components/purchase-form";
 import { useRegistry } from "@/lib/offline/registry";
 
-export default function NewPurchasePage() {
+function NewBill() {
+  const params = useSearchParams();
   const { profile } = useRegistry();
-  return <PurchaseForm profile={profile} />;
+  return <PurchaseForm profile={profile} supplierId={params.get("supplier")} />;
+}
+
+export default function NewPurchasePage() {
+  return (
+    <Suspense>
+      <NewBill />
+    </Suspense>
+  );
 }

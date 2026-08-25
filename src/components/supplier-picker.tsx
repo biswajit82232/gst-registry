@@ -10,14 +10,18 @@ export function SupplierPicker({
   name,
   onChange,
   ownGstin,
+  inputRef,
+  autoFocus,
 }: {
   suppliers: Supplier[];
   name: string;
   gstin?: string;
   ownGstin?: string | null;
+  inputRef?: React.Ref<HTMLInputElement>;
+  autoFocus?: boolean;
   onChange: (next: {
     supplier_name: string;
-    supplier_gstin: string;
+    supplier_gstin?: string;
     supplier_id: string | null;
     tax_type?: "intra" | "inter";
     place_of_supply?: string;
@@ -25,16 +29,18 @@ export function SupplierPicker({
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const q = name.trim().toLowerCase();
 
   const matches = useMemo(() => {
-    const q = name.trim().toLowerCase();
     if (!q) return suppliers.slice(0, 6);
     return suppliers
       .filter((s) =>
         [s.name, s.gstin].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)),
       )
       .slice(0, 6);
-  }, [name, suppliers]);
+  }, [q, suppliers]);
+
+  const exact = matches.find((s) => s.name.toLowerCase() === q);
 
   useEffect(() => {
     function onDoc(e: Event) {
@@ -55,27 +61,51 @@ export function SupplierPicker({
     setOpen(false);
   }
 
+  const showList = open && (matches.length > 0 || q.length > 0);
+
   return (
     <div ref={box} className="relative">
       <input
+        ref={inputRef}
         required
+        autoFocus={autoFocus}
+        role="combobox"
+        aria-expanded={showList}
+        aria-autocomplete="list"
         className={inputClass()}
-        placeholder="Name or pick saved"
+        placeholder="Type or pick a party"
         autoComplete="off"
         value={name}
         onFocus={() => setOpen(true)}
-        onChange={(e) =>
+        onChange={(e) => {
+          const supplier_name = e.target.value;
+          const hit = suppliers.find(
+            (s) => s.name.toLowerCase() === supplier_name.trim().toLowerCase(),
+          );
+          if (hit) {
+            onChange({
+              supplier_name,
+              supplier_gstin: hit.gstin ?? "",
+              supplier_id: hit.id,
+              tax_type: detectTaxType(hit.gstin, ownGstin),
+              place_of_supply: gstinState(hit.gstin) || gstinState(ownGstin) || "",
+            });
+            return;
+          }
           onChange({
-            supplier_name: e.target.value,
+            supplier_name,
             supplier_gstin: "",
             supplier_id: null,
-          })
-        }
+          });
+        }}
       />
-      {open && matches.length > 0 ? (
-        <ul className="absolute z-20 mt-0.5 max-h-44 w-full overflow-auto rounded-md border border-line bg-bg-elev py-0.5 shadow-lg">
+      {showList ? (
+        <ul
+          role="listbox"
+          className="absolute z-20 mt-0.5 max-h-44 w-full overflow-auto rounded-md border border-line bg-bg-elev py-0.5 shadow-lg"
+        >
           {matches.map((s) => (
-            <li key={s.id}>
+            <li key={s.id} role="option">
               <button
                 type="button"
                 className="flex min-h-11 w-full flex-col items-start px-2 py-1.5 text-left active:bg-line/50"
@@ -86,6 +116,11 @@ export function SupplierPicker({
               </button>
             </li>
           ))}
+          {q && !exact ? (
+            <li className="border-t border-line px-2 py-1.5 text-[11px] text-muted">
+              New party · saved with this bill
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>

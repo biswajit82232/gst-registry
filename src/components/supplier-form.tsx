@@ -7,7 +7,13 @@ import { isValidGstin, gstinState } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
 import type { Supplier } from "@/lib/types";
 
-export function SupplierForm({ supplier }: { supplier?: Supplier }) {
+export function SupplierForm({
+  supplier,
+  onSaved,
+}: {
+  supplier?: Supplier;
+  onSaved?: (saved: Supplier) => void;
+}) {
   const router = useRouter();
   const { saveSupplier } = useRegistry();
   const [name, setName] = useState(supplier?.name ?? "");
@@ -34,7 +40,8 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
         notes,
         id: supplier?.id,
       });
-      router.push(`/suppliers/${saved.id}`);
+      if (onSaved) onSaved(saved);
+      else router.push(`/suppliers/${saved.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save supplier.");
     } finally {
@@ -56,7 +63,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
       </Field>
       <Field
         label="GSTIN"
-        hint={gstin && gstinOk ? gstinState(gstin) || "State not recognised" : "Optional, needed for 2B"}
+        hint={gstin && gstinOk ? gstinState(gstin) || "State not recognised" : "Optional"}
       >
         <input
           className={inputClass(!gstinOk ? "border-rose-400" : undefined)}

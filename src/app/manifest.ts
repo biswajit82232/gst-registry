@@ -49,6 +49,12 @@ export default function manifest(): MetadataRoute.Manifest {
         url: "/",
         icons: [{ src: "/icon/192", sizes: "192x192", type: "image/png" }],
       },
+      {
+        name: "Parties",
+        short_name: "Parties",
+        url: "/suppliers",
+        icons: [{ src: "/icon/192", sizes: "192x192", type: "image/png" }],
+      },
     ],
   };
 }

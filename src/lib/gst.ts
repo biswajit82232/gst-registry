@@ -2,6 +2,128 @@ import type { Purchase, PurchaseInput, PurchaseTotals, TaxType } from "./types";
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
 
+export type BillLine = { taxable: number; rate: number };
+
+const LINES_PREFIX = "GSTLINES:";
+
+export function lineGst(line: BillLine): number {
+  return round2((toNumber(line.taxable) * toNumber(line.rate)) / 100);
+}
+
+export function lineTotal(line: BillLine): number {
+  return round2(toNumber(line.taxable) + lineGst(line));
+}
+
+function parseRate(value: unknown): number {
+  if (value == null || value === "") return 18;
+  const n = toNumber(value);
+  return n < 0 ? 18 : n;
+}
+
+function extraNoteFrom(raw: string): string | undefined {
+  if (!raw.startsWith(LINES_PREFIX)) return raw.trim() || undefined;
+  try {
+    const parsed = JSON.parse(raw.slice(LINES_PREFIX.length)) as { n?: unknown };
+    if (parsed && !Array.isArray(parsed) && typeof parsed.n === "string" && parsed.n.trim()) {
+      return parsed.n;
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
+export function encodeLines(lines: BillLine[], previousNotes?: string | null): string {
+  const items = lines.map((line) => ({ a: round2(toNumber(line.taxable)), r: parseRate(line.rate) }));
+  const extra = extraNoteFrom(previousNotes ?? "");
+  return LINES_PREFIX + JSON.stringify(extra ? { v: 1, items, n: extra } : items);
+}
+
+export function decodeLines(purchase: {
+  notes?: string | null;
+  taxable_value: number;
+  gst_rate: number;
+  invoice_total?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+}): BillLine[] {
+  const raw = purchase.notes ?? "";
+  if (raw.startsWith(LINES_PREFIX)) {
+    try {
+      const parsed = JSON.parse(raw.slice(LINES_PREFIX.length)) as
+        | Array<{ a?: number; r?: number }>
+        | { items?: Array<{ a?: number; r?: number }> };
+      const rows = Array.isArray(parsed) ? parsed : parsed.items;
+      if (Array.isArray(rows) && rows.length > 0) {
+        return rows.map((row) => ({ taxable: toNumber(row.a), rate: parseRate(row.r) }));
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  const gst = toNumber(purchase.cgst) + toNumber(purchase.sgst) + toNumber(purchase.igst);
+  let taxable = toNumber(purchase.taxable_value);
+  if (taxable <= 0 && toNumber(purchase.invoice_total) > 0) {
+    taxable = round2(Math.max(0, toNumber(purchase.invoice_total) - gst));
+  }
+  const stored = toNumber(purchase.gst_rate);
+  const computedFromStored = round2((taxable * stored) / 100);
+  let rate = stored || 18;
+  if (stored > 0 && Math.abs(computedFromStored - gst) <= 0.05) {
+    rate = stored;
+  } else if (taxable > 0 && gst > 0) {
+    rate = (gst / taxable) * 100;
+  }
+  return [{ taxable, rate }];
+}
+
+export function totalsFromLines(lines: BillLine[]): {
+  taxable_value: number;
+  gst: number;
+  invoice_total: number;
+  gst_rate: number;
+} {
+  const taxable_value = round2(lines.reduce((sum, line) => sum + toNumber(line.taxable), 0));
+  const gst = round2(lines.reduce((sum, line) => sum + lineGst(line), 0));
+  const main = lines.slice().sort((a, b) => toNumber(b.taxable) - toNumber(a.taxable))[0];
+  const mainRate = main ? parseRate(main.rate) : 18;
+  return {
+    taxable_value,
+    gst,
+    invoice_total: round2(taxable_value + gst),
+    gst_rate: mainRate,
+  };
+}
+
+export function applyLinesToInput<T extends {
+  taxable_value: number;
+  invoice_total: number;
+  gst_rate: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  cess: number;
+  notes: string | null;
+  itc_eligible: boolean;
+}>(form: T, lines: BillLine[]): T {
+  const kept = lines.filter((line) => toNumber(line.taxable) > 0);
+  const use = kept.length > 0 ? kept : lines;
+  const totals = totalsFromLines(use);
+  return {
+    ...form,
+    taxable_value: totals.taxable_value,
+    invoice_total: totals.invoice_total,
+    gst_rate: totals.gst_rate,
+    cgst: 0,
+    sgst: 0,
+    igst: totals.gst,
+    cess: 0,
+    notes: encodeLines(use, form.notes),
+    itc_eligible: true,
+  };
+}
+
 export const STATE_CODES: Record<string, string> = {
   "01": "Jammu & Kashmir",
   "02": "Himachal Pradesh",

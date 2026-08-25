@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, Settings2 } from "lucide-react";
+import { Home, Plus, Settings2, Users } from "lucide-react";
 import { cn } from "./ui";
 
 const items = [
   { href: "/", label: "Register", icon: Home },
   { href: "/purchases/new", label: "Add", icon: Plus },
+  { href: "/suppliers", label: "Parties", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
@@ -19,7 +20,7 @@ export function BottomNav() {
       aria-label="Primary"
       className="bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg-elev/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
     >
-      <ul className="grid grid-cols-3">
+      <ul className="grid grid-cols-4">
         {items.map((item) => {
           const active =
             item.href === "/"

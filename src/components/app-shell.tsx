@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, Settings2, Stamp } from "lucide-react";
+import { Home, Plus, Settings2, Stamp, Users } from "lucide-react";
 import { BottomNav } from "./bottom-nav";
 import { SyncBadge } from "./sync-badge";
 import { ThemeToggle } from "./theme-toggle";
@@ -12,6 +12,7 @@ import { useRegistry } from "@/lib/offline/registry";
 const links = [
   { href: "/", label: "Register", icon: Home },
   { href: "/purchases/new", label: "Add bill", icon: Plus },
+  { href: "/suppliers", label: "Parties", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
@@ -19,6 +20,9 @@ function titleFor(pathname: string): string {
   if (pathname === "/") return "Register";
   if (pathname === "/purchases/new") return "Add bill";
   if (pathname.startsWith("/purchases/")) return "Bill";
+  if (pathname === "/suppliers/new") return "New party";
+  if (pathname.startsWith("/suppliers/")) return "Party";
+  if (pathname === "/suppliers") return "Parties";
   if (pathname === "/settings") return "Settings";
   return "GST Registry";
 }
@@ -54,7 +58,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             const active =
               link.href === "/"
                 ? pathname === "/" || (pathname.startsWith("/purchases") && pathname !== "/purchases/new")
-                : pathname === link.href;
+                : link.href === "/suppliers"
+                  ? pathname.startsWith("/suppliers")
+                  : pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
                 key={link.href}
