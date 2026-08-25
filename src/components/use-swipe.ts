@@ -12,7 +12,7 @@ export function useHorizontalSwipe(onSwipe: (dir: "left" | "right") => void) {
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest("[role='tablist'], input, textarea, select")) return;
+    if (target?.closest("input, textarea, select")) return;
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);

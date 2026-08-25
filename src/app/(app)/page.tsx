@@ -7,11 +7,19 @@ import { PurchaseCard, PurchaseList, ShowMore } from "@/components/purchase-card
 import { useWindowed } from "@/components/use-windowed";
 import { useHorizontalSwipe } from "@/components/use-swipe";
 import { Alert, Empty, UnderlineTabs, UndoBar } from "@/components/ui";
-import { formatCompact, monthRange, shiftMonth } from "@/lib/format";
+import { formatCompact, monthRange } from "@/lib/format";
 import { totalsOf } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
 
 type Filter = "waiting" | "got" | "missing" | "all";
+
+const FILTERS: Filter[] = ["waiting", "got", "missing", "all"];
+
+function shiftFilter(current: Filter, dir: "left" | "right"): Filter {
+  const i = FILTERS.indexOf(current);
+  const delta = dir === "left" ? 1 : -1;
+  return FILTERS[(i + delta + FILTERS.length) % FILTERS.length];
+}
 
 export default function HomePage() {
   const { purchases, markInput, syncError, month, setMonth } = useRegistry();
@@ -33,7 +41,7 @@ export default function HomePage() {
   }, [rows, filter]);
   const windowed = useWindowed(visible, `${month}:${filter}:${visible.length}`);
   const swipe = useHorizontalSwipe((dir) => {
-    setMonth(shiftMonth(month, dir === "left" ? 1 : -1));
+    setFilter((current) => shiftFilter(current, dir));
   });
 
   async function markGot(id: string) {
@@ -49,63 +57,69 @@ export default function HomePage() {
   }
 
   return (
-    <div className="touch-pan-y space-y-5" {...swipe}>
-      <p className="sr-only">Swipe left or right to change month.</p>
+    <div className="space-y-5">
       <MonthBar month={month} onChange={setMonth} />
-      <p className="tabular text-[13px] text-muted">
-        Waiting {formatCompact(totals.waitingGst)}
-        <span className="mx-1.5 text-line">·</span>
-        Got {formatCompact(totals.gotGst)}
-        <span className="mx-1.5 text-line">·</span>
-        {totals.count} {totals.count === 1 ? "bill" : "bills"}
-      </p>
-      <UnderlineTabs
-        value={filter}
-        onChange={setFilter}
-        ariaLabel="Filter"
-        options={[
-          { id: "waiting", label: `Waiting ${totals.waitingCount}` },
-          { id: "got", label: `Got ${totals.gotCount}` },
-          { id: "missing", label: "No" },
-          { id: "all", label: "All" },
-        ]}
-      />
-      {hint || syncError ? <Alert tone="danger">{hint || syncError}</Alert> : null}
-      {undoId ? (
-        <UndoBar
-          message="Marked got"
-          onUndo={() => {
-            void markInput(undoId, "waiting");
-            setUndoId(null);
-          }}
+      <div className="touch-pan-y space-y-5" {...swipe}>
+        <p className="sr-only">Swipe left or right to switch Waiting, Got, No, and All.</p>
+        <p className="tabular text-[13px] text-muted">
+          Waiting {formatCompact(totals.waitingGst)}
+          <span className="mx-1.5 text-line">·</span>
+          Got {formatCompact(totals.gotGst)}
+          <span className="mx-1.5 text-line">·</span>
+          {totals.count} {totals.count === 1 ? "bill" : "bills"}
+        </p>
+        <UnderlineTabs
+          value={filter}
+          onChange={setFilter}
+          ariaLabel="Filter"
+          options={[
+            { id: "waiting", label: `Waiting ${totals.waitingCount}` },
+            { id: "got", label: `Got ${totals.gotCount}` },
+            { id: "missing", label: "No" },
+            { id: "all", label: "All" },
+          ]}
         />
-      ) : null}
-      {visible.length === 0 ? (
-        <Empty
-          title={rows.length === 0 ? "No bills this month" : "Nothing in this list"}
-          hint={rows.length === 0 ? "Add a purchase. Mark Got when the GST shows in 2B." : "Try another filter."}
-        >
-          {rows.length === 0 ? (
-            <Link
-              href="/purchases/new"
-              className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
-            >
-              Add bill
-            </Link>
-          ) : null}
-        </Empty>
-      ) : (
-        <PurchaseList>
-          {windowed.visible.map((row) => (
-            <PurchaseCard
-              key={row.id}
-              purchase={row}
-              onGotInput={row.input_status === "waiting" ? markGot : undefined}
-            />
-          ))}
-          <ShowMore remaining={windowed.remaining} onClick={windowed.showMore} />
-        </PurchaseList>
-      )}
+        {hint || syncError ? <Alert tone="danger">{hint || syncError}</Alert> : null}
+        {undoId ? (
+          <UndoBar
+            message="Marked got"
+            onUndo={() => {
+              void markInput(undoId, "waiting");
+              setUndoId(null);
+            }}
+          />
+        ) : null}
+        {visible.length === 0 ? (
+          <Empty
+            title={rows.length === 0 ? "No bills this month" : "Nothing in this list"}
+            hint={
+              rows.length === 0
+                ? "Add a purchase. Mark Got when the GST shows in 2B."
+                : "Try another filter."
+            }
+          >
+            {rows.length === 0 ? (
+              <Link
+                href="/purchases/new"
+                className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
+              >
+                Add bill
+              </Link>
+            ) : null}
+          </Empty>
+        ) : (
+          <PurchaseList>
+            {windowed.visible.map((row) => (
+              <PurchaseCard
+                key={row.id}
+                purchase={row}
+                onGotInput={row.input_status === "waiting" ? markGot : undefined}
+              />
+            ))}
+            <ShowMore remaining={windowed.remaining} onClick={windowed.showMore} />
+          </PurchaseList>
+        )}
+      </div>
     </div>
   );
 }
