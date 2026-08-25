@@ -4,23 +4,27 @@ import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InstallCard } from "@/components/pwa";
 import { Alert, Button, Field, inputClass } from "@/components/ui";
+import { gstinState, isValidGstin } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
 import { signOut } from "./actions";
 
 export default function SettingsPage() {
   const { profile, userEmail, saveProfile, clearLocal } = useRegistry();
   const [business, setBusiness] = useState(profile?.business_name ?? "");
+  const [gstin, setGstin] = useState(profile?.gstin ?? "");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const gstinOk = !gstin.trim() || isValidGstin(gstin);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!gstinOk) return;
     setSaving(true);
     setStatus("");
     try {
       await saveProfile({
         business_name: business.trim() || null,
-        gstin: profile?.gstin ?? null,
+        gstin: gstin.trim() || null,
       });
       setStatus("Saved.");
     } catch (err) {
@@ -47,9 +51,23 @@ export default function SettingsPage() {
             autoComplete="organization"
           />
         </Field>
+        <Field
+          label="GSTIN"
+          hint={gstin && gstinOk ? gstinState(gstin) || "Used on PDF reports" : "Printed on month and FY PDFs"}
+        >
+          <input
+            className={inputClass(!gstinOk ? "border-rose-400" : undefined)}
+            value={gstin}
+            onChange={(e) => setGstin(e.target.value.toUpperCase())}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="27AAAAA0000A1Z5"
+          />
+        </Field>
         <p className="text-[13px] text-muted">{profile?.email || userEmail}</p>
         {status ? <Alert tone={status === "Saved." ? "muted" : "danger"}>{status}</Alert> : null}
-        <Button type="submit" className="w-full" disabled={saving}>
+        <Button type="submit" className="w-full" disabled={saving || !gstinOk}>
           {saving ? "Saving…" : "Save"}
         </Button>
       </form>

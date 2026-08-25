@@ -1,12 +1,245 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatDate, formatMoney } from "./format";
-import { totalsOf } from "./gst";
-import { inputLabel } from "./input";
+import { formatDate } from "./format";
+import { decodeLines, totalsOf } from "./gst";
+import { gstOf, inputLabel } from "./input";
 import type { Profile, Purchase } from "./types";
 
-function rs(n: number): string {
-  return formatMoney(n).replace("₹", "Rs. ");
+const INK: [number, number, number] = [26, 25, 22];
+const MUTED: [number, number, number] = [107, 104, 96];
+const LINE: [number, number, number] = [214, 210, 200];
+const HEAD: [number, number, number] = [26, 25, 22];
+const BAND: [number, number, number] = [247, 246, 243];
+const FOOT: [number, number, number] = [243, 241, 234];
+const MARGIN = { top: 40, left: 12, right: 12, bottom: 16 };
+const PAGE_W = 297;
+const INNER = PAGE_W - MARGIN.left - MARGIN.right;
+
+type MonthBucket = { label: string; rows: Purchase[] };
+
+function money(n: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(n) ? n : 0);
+}
+
+function rateLabel(row: Purchase): string {
+  const lines = decodeLines(row).filter((line) => line.taxable > 0);
+  const use = lines.length > 0 ? lines : decodeLines(row);
+  const rates = [
+    ...new Set(
+      use.map((line) => {
+        const r = line.rate;
+        return Number.isInteger(r) ? `${r}%` : `${r.toFixed(1)}%`;
+      }),
+    ),
+  ];
+  return rates.join("+") || "—";
+}
+
+function sorted(rows: Purchase[]): Purchase[] {
+  return rows.slice().sort(
+    (a, b) =>
+      a.invoice_date.localeCompare(b.invoice_date) ||
+      a.invoice_number.localeCompare(b.invoice_number) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
+function lastY(doc: jsPDF): number {
+  return (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? MARGIN.top;
+}
+
+function fileStamp(label: string): string {
+  return label
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]/g, "");
+}
+
+function fit(doc: jsPDF, text: string, maxWidth: number): string {
+  if (doc.getTextWidth(text) <= maxWidth) return text;
+  const ell = "...";
+  let t = text;
+  while (t.length > 1 && doc.getTextWidth(t + ell) > maxWidth) t = t.slice(0, -1);
+  return t + ell;
+}
+
+function drawChrome(
+  doc: jsPDF,
+  opts: {
+    business: string;
+    gstin: string;
+    period: string;
+    generated: string;
+  },
+) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const pages = doc.getNumberOfPages();
+  const leftMax = pageW * 0.58 - MARGIN.left;
+  const rightMax = pageW * 0.38 - MARGIN.right;
+
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+
+    doc.setFillColor(...HEAD);
+    doc.rect(0, 0, pageW, 28, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("GST PURCHASE REGISTER", MARGIN.left, 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(fit(doc, opts.period, rightMax), pageW - MARGIN.right, 10, { align: "right" });
+    doc.text(fit(doc, opts.business, leftMax), MARGIN.left, 16.5);
+    doc.text(fit(doc, `GSTIN  ${opts.gstin}`, leftMax), MARGIN.left, 22);
+    doc.text(fit(doc, `Generated  ${opts.generated}`, rightMax), pageW - MARGIN.right, 22, {
+      align: "right",
+    });
+
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.3);
+    doc.line(MARGIN.left, pageH - 11, pageW - MARGIN.right, pageH - 11);
+    doc.setTextColor(...MUTED);
+    doc.setFontSize(7.5);
+    doc.text("Amounts in INR. Working paper for GSTR-2B / ITC — verify before filing.", MARGIN.left, pageH - 6);
+    doc.text(`Page ${i} of ${pages}`, pageW - MARGIN.right, pageH - 6, { align: "right" });
+  }
+}
+
+function billBody(rows: Purchase[]) {
+  return sorted(rows).map((row, i) => [
+    String(i + 1),
+    formatDate(row.invoice_date),
+    row.invoice_number || "—",
+    row.supplier_name || "—",
+    row.supplier_gstin || "—",
+    rateLabel(row),
+    money(row.taxable_value),
+    money(gstOf(row)),
+    money(row.invoice_total),
+    inputLabel(row.input_status),
+  ]);
+}
+
+const tableBase = {
+  theme: "plain" as const,
+  margin: MARGIN,
+  tableWidth: INNER,
+  showHead: "everyPage" as const,
+  showFoot: "lastPage" as const,
+  styles: {
+    font: "helvetica" as const,
+    textColor: INK,
+    lineColor: LINE,
+    lineWidth: 0.15,
+    valign: "middle" as const,
+    minCellHeight: 6.2,
+  },
+  headStyles: {
+    fillColor: HEAD,
+    textColor: 255,
+    fontStyle: "bold" as const,
+    cellPadding: { top: 2.2, bottom: 2.2, left: 1.5, right: 1.5 },
+  },
+  footStyles: {
+    fillColor: FOOT,
+    textColor: INK,
+    fontStyle: "bold" as const,
+  },
+  alternateRowStyles: { fillColor: BAND },
+};
+
+function billTable(doc: jsPDF, rows: Purchase[], startY: number) {
+  const totals = totalsOf(rows);
+  autoTable(doc, {
+    ...tableBase,
+    startY,
+    styles: {
+      ...tableBase.styles,
+      fontSize: 7.5,
+      cellPadding: { top: 1.6, bottom: 1.6, left: 1.4, right: 1.4 },
+      overflow: "ellipsize",
+    },
+    headStyles: { ...tableBase.headStyles, fontSize: 7.5 },
+    footStyles: { ...tableBase.footStyles, fontSize: 7.5 },
+    head: [["#", "Date", "Invoice", "Party", "GSTIN", "Rate", "Taxable", "GST", "Total", "Input"]],
+    body: billBody(rows),
+    foot: [
+      [
+        { content: `${totals.count} bills`, colSpan: 6, styles: { halign: "left" } },
+        money(totals.taxable),
+        money(totals.gst),
+        money(totals.total),
+        `${totals.gotCount} got`,
+      ],
+    ],
+    columnStyles: {
+      0: { cellWidth: 11, halign: "right" },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 60, overflow: "linebreak" },
+      4: { cellWidth: 38, fontSize: 7 },
+      5: { cellWidth: 20, halign: "right" },
+      6: { cellWidth: 27, halign: "right" },
+      7: { cellWidth: 24, halign: "right" },
+      8: { cellWidth: 27, halign: "right" },
+      9: { cellWidth: 16, halign: "center" },
+    },
+  });
+}
+
+function summaryTable(doc: jsPDF, months: MonthBucket[], startY: number) {
+  const body = months.map((bucket) => {
+    const t = totalsOf(bucket.rows);
+    return [
+      bucket.label,
+      String(t.count),
+      money(t.taxable),
+      money(t.gst),
+      money(t.total),
+      money(t.gotGst),
+      money(t.waitingGst),
+      money(t.missingGst),
+    ];
+  });
+  const all = totalsOf(months.flatMap((bucket) => bucket.rows));
+  autoTable(doc, {
+    ...tableBase,
+    startY,
+    styles: {
+      ...tableBase.styles,
+      fontSize: 8,
+      cellPadding: { top: 2, bottom: 2, left: 1.6, right: 1.6 },
+    },
+    headStyles: { ...tableBase.headStyles, fontSize: 8 },
+    head: [["Month", "Bills", "Taxable", "GST", "Total", "Got", "Waiting", "No"]],
+    body,
+    foot: [
+      [
+        "Year total",
+        String(all.count),
+        money(all.taxable),
+        money(all.gst),
+        money(all.total),
+        money(all.gotGst),
+        money(all.waitingGst),
+        money(all.missingGst),
+      ],
+    ],
+    columnStyles: {
+      0: { cellWidth: 36, fontStyle: "bold" },
+      1: { cellWidth: 18, halign: "right" },
+      2: { cellWidth: 36.5, halign: "right" },
+      3: { cellWidth: 36.5, halign: "right" },
+      4: { cellWidth: 36.5, halign: "right" },
+      5: { cellWidth: 36.5, halign: "right" },
+      6: { cellWidth: 36.5, halign: "right" },
+      7: { cellWidth: 36.5, halign: "right" },
+    },
+  });
 }
 
 export function downloadPurchasePdf(
@@ -14,91 +247,61 @@ export function downloadPurchasePdf(
   opts: {
     profile: Profile | null;
     periodLabel: string;
+    months?: MonthBucket[];
   },
 ) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const totals = totalsOf(rows);
-  const business = opts.profile?.business_name || "My business";
-  const gstin = opts.profile?.gstin || "GSTIN not set";
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("GST Purchase Register", 14, 16);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text(business, 14, 23);
-  doc.text(`GSTIN: ${gstin}   Period: ${opts.periodLabel}`, 14, 29);
-  doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, 14, 35);
-
-  autoTable(doc, {
-    startY: 40,
-    head: [
-      [
-        "Date",
-        "Invoice",
-        "Supplier",
-        "GSTIN",
-        "Taxable",
-        "CGST",
-        "SGST",
-        "IGST",
-        "Total",
-        "Input",
-      ],
-    ],
-    body: rows.map((row) => [
-      formatDate(row.invoice_date),
-      row.invoice_number,
-      row.supplier_name,
-      row.supplier_gstin || "—",
-      rs(row.taxable_value),
-      rs(row.cgst),
-      rs(row.sgst),
-      rs(row.igst),
-      rs(row.invoice_total),
-      inputLabel(row.input_status),
-    ]),
-    foot: [
-      [
-        "",
-        "",
-        `${totals.count} bills`,
-        "",
-        rs(totals.taxable),
-        rs(totals.cgst),
-        rs(totals.sgst),
-        rs(totals.igst),
-        rs(totals.total),
-        `${totals.gotCount} got`,
-      ],
-    ],
-    styles: { fontSize: 8, cellPadding: 1.6 },
-    headStyles: { fillColor: [13, 148, 136], textColor: 255 },
-    footStyles: { fillColor: [240, 253, 250], textColor: 20, fontStyle: "bold" },
-    columnStyles: {
-      4: { halign: "right" },
-      5: { halign: "right" },
-      6: { halign: "right" },
-      7: { halign: "right" },
-      8: { halign: "right" },
-    },
+  const business = opts.profile?.business_name?.trim() || "My business";
+  const gstin = opts.profile?.gstin?.trim() || "Not set";
+  const generated = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
-  const y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 40;
-  doc.setFontSize(10);
-  doc.text(
-    `GST paid: ${rs(totals.gst)}    Got input: ${rs(totals.gotGst)}    Waiting: ${rs(totals.waitingGst)}    Not received: ${rs(totals.missingGst)}`,
-    14,
-    y + 10,
-  );
-  doc.setFontSize(8);
-  doc.setTextColor(100);
-  doc.text(
-    "For CA reconciliation with GSTR-2B. Verify supplier GSTIN, invoice number and tax split before filing.",
-    14,
-    y + 16,
-  );
+  doc.setProperties({
+    title: `GST Purchase Register — ${opts.periodLabel}`,
+    subject: "Purchase register for ITC / GSTR-2B working",
+    author: business,
+    creator: "GST Registry",
+  });
 
-  const safePeriod = opts.periodLabel.replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-  doc.save(`GST-Purchase-Register-${safePeriod}.pdf`);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...INK);
+  const kpi = [
+    `${totals.count} bills`,
+    `Taxable  ${money(totals.taxable)}`,
+    `GST  ${money(totals.gst)}`,
+    `Total  ${money(totals.total)}`,
+    `Got  ${money(totals.gotGst)}`,
+    `Waiting  ${money(totals.waitingGst)}`,
+    `No  ${money(totals.missingGst)}`,
+  ].join("   ·   ");
+  doc.text(kpi, MARGIN.left, 33.4, { maxWidth: INNER });
+
+  let y = MARGIN.top;
+  if (opts.months && opts.months.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("Monthly summary", MARGIN.left, y);
+    summaryTable(doc, opts.months, y + 3);
+    y = lastY(doc) + 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...INK);
+    if (y > doc.internal.pageSize.getHeight() - 48) {
+      doc.addPage();
+      y = MARGIN.top;
+    }
+    doc.text("Bill-wise register", MARGIN.left, y);
+    y += 3;
+  }
+
+  billTable(doc, rows, y);
+  drawChrome(doc, { business, gstin, period: opts.periodLabel, generated });
+  doc.save(`GST-Register-${fileStamp(opts.periodLabel)}.pdf`);
 }

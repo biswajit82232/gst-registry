@@ -79,19 +79,56 @@ export function monthRange(ym: string): { start: string; end: string } {
   };
 }
 
+export function fyStartYearFromMonth(ym: string): number {
+  const [y, m] = ym.split("-").map(Number);
+  if (!y || !m) return fyStartYearFromDate();
+  return m >= 4 ? y : y - 1;
+}
+
+export function fyStartYearFromDate(from = new Date()): number {
+  const y = from.getFullYear();
+  const m = from.getMonth() + 1;
+  return m >= 4 ? y : y - 1;
+}
+
+export function fyLabelFromStart(startYear: number): string {
+  return `FY ${startYear}–${String(startYear + 1).slice(2)}`;
+}
+
+export function fyRangeFromStart(startYear: number): {
+  start: string;
+  end: string;
+  label: string;
+} {
+  return {
+    start: `${startYear}-04-01`,
+    end: `${startYear + 1}-03-31`,
+    label: fyLabelFromStart(startYear),
+  };
+}
+
+export function monthsInFy(startYear: number): string[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(startYear, 3 + i, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+}
+
+export function monthShort(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  if (!y || !m) return ym;
+  return new Date(y, m - 1, 1).toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function financialYear(from = new Date()): {
   start: string;
   end: string;
   label: string;
 } {
-  const y = from.getFullYear();
-  const m = from.getMonth() + 1;
-  const startYear = m >= 4 ? y : y - 1;
-  return {
-    start: `${startYear}-04-01`,
-    end: `${startYear + 1}-03-31`,
-    label: `FY ${startYear}–${String(startYear + 1).slice(2)}`,
-  };
+  return fyRangeFromStart(fyStartYearFromDate(from));
 }
 
 export function todayIso(): string {

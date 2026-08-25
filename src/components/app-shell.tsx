@@ -1,5 +1,6 @@
 "use client";
 
+import { FileText } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "./brand";
@@ -24,6 +25,7 @@ function titleFor(pathname: string): string {
   if (pathname.startsWith("/suppliers/")) return "Party";
   if (pathname === "/suppliers") return "Parties";
   if (pathname === "/settings") return "Settings";
+  if (pathname === "/reports") return "Reports";
   return "GST Registry";
 }
 
@@ -93,6 +95,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center">
+            <Link
+              href="/reports"
+              prefetch
+              title="Reports"
+              aria-label="PDF reports"
+              aria-current={pathname === "/reports" ? "page" : undefined}
+              className={cn(
+                "inline-flex h-11 w-11 items-center justify-center rounded-md active:bg-line/40",
+                pathname === "/reports" ? "text-ink" : "text-muted",
+              )}
+            >
+              <FileText className="h-4 w-4" />
+            </Link>
             <SyncBadge />
             <ThemeToggle />
           </div>
