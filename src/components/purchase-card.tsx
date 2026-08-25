@@ -14,47 +14,38 @@ export const PurchaseCard = memo(function PurchaseCard({
   onGotInput?: (id: string) => void;
 }) {
   const gst = gstOf(purchase);
-  const showGot =
-    onGotInput && purchase.itc_eligible && purchase.input_status === "waiting" && gst > 0;
+  const showGot = onGotInput && purchase.input_status === "waiting";
   const status = purchase.input_status;
   const statusClass =
-    !purchase.itc_eligible
-      ? "text-muted"
-      : status === "got"
-        ? "text-emerald-700 dark:text-emerald-300"
-        : status === "missing"
-          ? "text-rose-700 dark:text-rose-300"
-          : "text-amber-700 dark:text-amber-300";
+    status === "got"
+      ? "text-emerald-700 dark:text-emerald-300"
+      : status === "missing"
+        ? "text-rose-700 dark:text-rose-300"
+        : "text-amber-700 dark:text-amber-300";
 
   return (
-    <div className="list-row flex items-stretch gap-1 px-2 py-1.5">
+    <div className="list-row flex items-stretch gap-1 px-2 py-2">
       <Link href={`/purchases/${purchase.id}`} prefetch className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="truncate text-[13px] font-semibold leading-tight">{purchase.supplier_name}</p>
-          <p className="tabular shrink-0 text-[13px] font-semibold">
+          <p className="truncate text-[14px] font-semibold leading-tight">{purchase.supplier_name}</p>
+          <p className="tabular shrink-0 text-[14px] font-semibold">
             {formatInr(purchase.invoice_total)}
           </p>
         </div>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] leading-tight text-muted">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] leading-tight text-muted">
           <span>
             {formatDate(purchase.invoice_date)}
-            {purchase.invoice_number.trim() ? ` · #${purchase.invoice_number}` : ""}
+            {purchase.invoice_number.trim() ? ` · ${purchase.invoice_number}` : ""}
           </span>
-          <span className={statusClass}>
-            {purchase.itc_eligible ? inputLabel(status) : "No ITC"}
-          </span>
+          <span className={statusClass}>{inputLabel(status)}</span>
           {gst > 0 ? <span>GST {formatInr(gst)}</span> : null}
-          {purchase.payment_status === "unpaid" ? (
-            <span className="text-amber-700 dark:text-amber-300">Unpaid</span>
-          ) : null}
-          {!purchase.supplier_gstin ? <span className="text-rose-700 dark:text-rose-300">No GSTIN</span> : null}
         </p>
       </Link>
       {showGot ? (
         <button
           type="button"
           onClick={() => onGotInput(purchase.id)}
-          className="my-auto h-9 min-w-11 shrink-0 rounded-md bg-teal-700 px-2.5 text-[11px] font-semibold text-white dark:bg-teal-400 dark:text-teal-950"
+          className="my-auto h-9 min-w-11 shrink-0 rounded-md bg-teal-700 px-2.5 text-[12px] font-semibold text-white dark:bg-teal-400 dark:text-teal-950"
         >
           Got
         </button>

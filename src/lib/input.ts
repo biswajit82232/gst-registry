@@ -15,9 +15,9 @@ export function parseInputStatus(value: unknown): InputStatus {
 }
 
 export function inputLabel(status: InputStatus): string {
-  if (status === "got") return "Got input";
-  if (status === "missing") return "Not received";
-  return "Waiting";
+  if (status === "got") return "Got";
+  if (status === "missing") return "No";
+  return "Wait";
 }
 
 export function isClaimable(row: Purchase): boolean {

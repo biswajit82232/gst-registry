@@ -1,11 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { SupplierForm } from "@/components/supplier-form";
-
-export default function NewSupplierPage() {
-  return (
-    <div>
-      <SupplierForm />
-    </div>
-  );
+export default function NewSupplierRedirect() {
+  redirect("/purchases/new");
 }

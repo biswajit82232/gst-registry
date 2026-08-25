@@ -179,16 +179,14 @@ export function totalsOf(rows: Purchase[]): PurchaseTotals {
       else acc.ineligible += gst;
       if (!row.supplier_gstin?.trim()) acc.missingGstin += 1;
       if (row.payment_status === "unpaid") acc.unpaid += 1;
-      if (row.itc_eligible && gst > 0) {
-        if (row.input_status === "got") {
-          acc.gotGst += gst;
-          acc.gotCount += 1;
-        } else if (row.input_status === "missing") {
-          acc.missingGst += gst;
-        } else {
-          acc.waitingGst += gst;
-          acc.waitingCount += 1;
-        }
+      if (row.input_status === "got") {
+        acc.gotGst += gst;
+        acc.gotCount += 1;
+      } else if (row.input_status === "missing") {
+        acc.missingGst += gst;
+      } else {
+        acc.waitingGst += gst;
+        acc.waitingCount += 1;
       }
       return acc;
     },

@@ -13,7 +13,7 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "GST Registry",
-  description: "Mobile GST purchase register for CA reconciliation",
+  description: "GST purchase register for your business",
   applicationName: "GST Registry",
   formatDetection: {
     telephone: false,

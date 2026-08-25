@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileSpreadsheet, Home, Plus, Settings2, Stamp, Users, Wallet } from "lucide-react";
+import { Home, Plus, Settings2, Stamp } from "lucide-react";
 import { BottomNav } from "./bottom-nav";
 import { SyncBadge } from "./sync-badge";
 import { ThemeToggle } from "./theme-toggle";
@@ -10,23 +10,15 @@ import { cn } from "./ui";
 import { useRegistry } from "@/lib/offline/registry";
 
 const links = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/purchases", label: "Reconcile", icon: Wallet },
+  { href: "/", label: "Register", icon: Home },
   { href: "/purchases/new", label: "Add bill", icon: Plus },
-  { href: "/suppliers", label: "Parties", icon: Users },
-  { href: "/reports", label: "Reports", icon: FileSpreadsheet },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
 function titleFor(pathname: string): string {
-  if (pathname === "/") return "Home";
-  if (pathname === "/purchases") return "Reconcile";
+  if (pathname === "/") return "Register";
   if (pathname === "/purchases/new") return "Add bill";
   if (pathname.startsWith("/purchases/")) return "Bill";
-  if (pathname === "/suppliers/new") return "Add party";
-  if (pathname.startsWith("/suppliers/") && pathname !== "/suppliers") return "Party";
-  if (pathname === "/suppliers") return "Parties";
-  if (pathname === "/reports") return "Reports";
   if (pathname === "/settings") return "Settings";
   return "GST Registry";
 }
@@ -52,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="min-w-0">
             <span className="block text-[13px] font-bold leading-tight">GST Registry</span>
             <span className="block truncate text-[10px] text-muted">
-              {profile?.business_name || "Purchase ITC"}
+              {profile?.business_name || "Purchase register"}
             </span>
           </span>
         </Link>
@@ -61,12 +53,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             const Icon = link.icon;
             const active =
               link.href === "/"
-                ? pathname === "/"
-                : pathname === link.href ||
-                  (link.href === "/purchases" &&
-                    pathname.startsWith("/purchases") &&
-                    pathname !== "/purchases/new") ||
-                  (link.href === "/suppliers" && pathname.startsWith("/suppliers"));
+                ? pathname === "/" || (pathname.startsWith("/purchases") && pathname !== "/purchases/new")
+                : pathname === link.href;
             return (
               <Link
                 key={link.href}
@@ -98,18 +86,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <SyncBadge />
-            <Link
-              href="/settings"
-              prefetch
-              aria-label="Settings"
-              aria-current={pathname === "/settings" ? "page" : undefined}
-              className={cn(
-                "inline-flex h-10 w-10 items-center justify-center rounded-full md:hidden",
-                pathname === "/settings" ? "text-teal-700 dark:text-teal-300" : "text-muted",
-              )}
-            >
-              <Settings2 className="h-4 w-4" />
-            </Link>
             <ThemeToggle />
           </div>
         </header>

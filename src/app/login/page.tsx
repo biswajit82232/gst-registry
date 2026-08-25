@@ -28,7 +28,7 @@ export default function LoginPage() {
           </span>
           <div>
             <h1 className="text-[17px] font-bold leading-tight">GST Registry</h1>
-            <p className="text-[11px] text-muted">Purchase GST, ready for the CA</p>
+            <p className="text-[12px] text-muted">GST purchase register</p>
           </div>
         </div>
         <form action={action} className="space-y-2 rounded-lg border border-line bg-bg-elev p-3">
