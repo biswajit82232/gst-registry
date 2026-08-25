@@ -1,7 +1,5 @@
 import type { InputStatus, Purchase, Supplier } from "./types";
-import { todayIso } from "./format";
 import { toNumber } from "./gst";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export function gstOf(row: Purchase): number {
   return toNumber(row.cgst) + toNumber(row.sgst) + toNumber(row.igst);
@@ -38,51 +36,6 @@ export function billsForSupplier(purchases: Purchase[], supplier: Supplier): Pur
       return false;
     })
     .sort((a, b) => b.invoice_date.localeCompare(a.invoice_date));
-}
-
-export async function setInputStatus(
-  supabase: SupabaseClient,
-  id: string,
-  input_status: InputStatus,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from("purchases")
-    .update({
-      input_status,
-      input_on: input_status === "waiting" ? null : todayIso(),
-    })
-    .eq("id", id);
-  if (!error) return { error: null };
-  const msg = error.message || "";
-  if (msg.toLowerCase().includes("input_status") || msg.includes("PGRST204")) {
-    return {
-      error: "Run supabase/input-status.sql once in the Supabase SQL editor, then try again.",
-    };
-  }
-  return { error: msg };
-}
-
-export async function setManyInputStatus(
-  supabase: SupabaseClient,
-  ids: string[],
-  input_status: InputStatus,
-): Promise<{ error: string | null }> {
-  if (ids.length === 0) return { error: null };
-  const { error } = await supabase
-    .from("purchases")
-    .update({
-      input_status,
-      input_on: input_status === "waiting" ? null : todayIso(),
-    })
-    .in("id", ids);
-  if (!error) return { error: null };
-  const msg = error.message || "";
-  if (msg.toLowerCase().includes("input_status") || msg.includes("PGRST204")) {
-    return {
-      error: "Run supabase/input-status.sql once in the Supabase SQL editor, then try again.",
-    };
-  }
-  return { error: msg };
 }
 
 export function supplierReliability(rows: Purchase[]): {

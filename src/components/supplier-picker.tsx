@@ -96,7 +96,6 @@ export function SupplierPicker({
           }
           onChange({
             supplier_name,
-            supplier_gstin: "",
             supplier_id: null,
           });
         }}

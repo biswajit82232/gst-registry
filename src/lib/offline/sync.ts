@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizePurchase } from "@/lib/gst";
+import { decodeLines, normalizePurchase } from "@/lib/gst";
 import { isMissingTable, normalizeSupplier } from "@/lib/suppliers";
 import type { Profile, Purchase, Supplier } from "@/lib/types";
 import type { GstDB, LocalPurchase, LocalSupplier } from "./db";
@@ -9,8 +9,8 @@ export const FULL_PULL_MS = 5 * 60_000;
 export const WRITE_DEBOUNCE_MS = 450;
 const PAGE = 1000;
 const UPSERT_CHUNK = 50;
-const INPUT_STATUS_HINT =
-  "Run supabase/input-status.sql once in the Supabase SQL editor, then try again.";
+const SCHEMA_HINT =
+  "Run pending Supabase migrations (`npx supabase db push`), then try again.";
 
 function maxUpdated(rows: Array<{ updated_at?: string | null }>): string | null {
   let max = "";
@@ -23,7 +23,11 @@ function maxUpdated(rows: Array<{ updated_at?: string | null }>): string | null 
 
 export function isInputStatusSchemaError(message: string): boolean {
   const msg = message.toLowerCase();
-  return msg.includes("input_status") || msg.includes("input_on") || msg.includes("pgrst204");
+  return msg.includes("input_status") || msg.includes("input_on");
+}
+
+export function isLinesSchemaError(message: string): boolean {
+  return /\blines\b/i.test(message);
 }
 
 export function isClockSkewError(message: string): boolean {
@@ -57,6 +61,39 @@ export function publicSyncError(message: string | null): string | null {
   return message;
 }
 
+export type ReconcileRow = { id: string; dirty: number; deleted: number };
+
+export function parseSeenIds(raw: string | undefined | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === "string" && id.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function planIdReconcile(
+  local: ReconcileRow[],
+  remoteIds: Iterable<string>,
+  opts: { remoteComplete: boolean; seenIds: Iterable<string> },
+): { dropIds: string[]; nextSeen: string[] } {
+  const remote = new Set(remoteIds);
+  const seen = new Set(opts.seenIds);
+  if (!opts.remoteComplete) {
+    return { dropIds: [], nextSeen: [...seen] };
+  }
+  const dropIds: string[] = [];
+  for (const row of local) {
+    if (remote.has(row.id)) continue;
+    if (row.deleted || !row.dirty || seen.has(row.id)) {
+      dropIds.push(row.id);
+    }
+  }
+  return { dropIds, nextSeen: [...remote] };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -85,6 +122,56 @@ async function fetchPaged<T>(
     from += PAGE;
   }
   return all;
+}
+
+async function pullRemoteIds(
+  supabase: SupabaseClient,
+  table: "purchases" | "suppliers",
+  userId: string,
+): Promise<{ ids: string[]; complete: boolean; missingTable: boolean }> {
+  try {
+    const rows = await fetchPaged<{ id: string }>(async (from, to) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select("id")
+        .eq("user_id", userId)
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data, error };
+    });
+    return {
+      ids: rows.map((row) => row.id).filter(Boolean),
+      complete: true,
+      missingTable: false,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (table === "suppliers" && isMissingTable({ message })) {
+      return { ids: [], complete: false, missingTable: true };
+    }
+    return { ids: [], complete: false, missingTable: false };
+  }
+}
+
+async function applyIdReconcile(
+  db: GstDB,
+  table: "purchases" | "suppliers",
+  userId: string,
+  supabase: SupabaseClient,
+): Promise<{ changed: boolean; missingTable: boolean }> {
+  const fetched = await pullRemoteIds(supabase, table, userId);
+  if (!fetched.complete) return { changed: false, missingTable: fetched.missingTable };
+  const metaKey = table === "purchases" ? "seenPurchaseIds" : "seenSupplierIds";
+  const seen = parseSeenIds((await db.meta.get(metaKey))?.value);
+  const local =
+    table === "purchases" ? await db.purchases.toArray() : await db.suppliers.toArray();
+  const plan = planIdReconcile(local, fetched.ids, { remoteComplete: true, seenIds: seen });
+  if (plan.dropIds.length) {
+    if (table === "purchases") await db.purchases.bulkDelete(plan.dropIds);
+    else await db.suppliers.bulkDelete(plan.dropIds);
+  }
+  await db.meta.put({ key: metaKey, value: JSON.stringify(plan.nextSeen) });
+  return { changed: plan.dropIds.length > 0, missingTable: fetched.missingTable };
 }
 
 export async function pullAll(
@@ -376,18 +463,33 @@ async function removeIfStillDeleted(
   return false;
 }
 
+function stripPurchaseSchema(payload: Record<string, unknown>, message: string): Record<string, unknown> | null {
+  if (isLinesSchemaError(message) && "lines" in payload) {
+    const { lines, ...rest } = payload;
+    void lines;
+    return rest;
+  }
+  if (isInputStatusSchemaError(message)) {
+    const { input_status, input_on, ...rest } = payload;
+    void input_status;
+    void input_on;
+    return rest;
+  }
+  return null;
+}
+
 async function upsertPurchase(
   supabase: SupabaseClient,
   row: LocalPurchase,
 ): Promise<{ error: string | null }> {
-  const payload = purchasePayload(row);
+  let payload = purchasePayload(row);
   let { error } = await supabase.from("purchases").upsert(payload, { onConflict: "id" });
-  if (error && isInputStatusSchemaError(error.message)) {
-    const { input_status, input_on, ...rest } = payload;
-    void input_status;
-    void input_on;
-    ({ error } = await supabase.from("purchases").upsert(rest, { onConflict: "id" }));
-    if (!error) return { error: INPUT_STATUS_HINT };
+  while (error) {
+    const stripped = stripPurchaseSchema(payload, error.message);
+    if (!stripped) break;
+    payload = stripped;
+    ({ error } = await supabase.from("purchases").upsert(payload, { onConflict: "id" }));
+    if (!error) return { error: SCHEMA_HINT };
   }
   return { error: error?.message ?? null };
 }
@@ -399,19 +501,17 @@ async function upsertPurchaseChunk(
 ): Promise<{ error: string | null; hint: string | null; wrote: boolean }> {
   if (!rows.length) return { error: null, hint: null, wrote: false };
 
-  const payloads = rows.map(purchasePayload);
+  let payloads = rows.map(purchasePayload);
   let { error } = await supabase.from("purchases").upsert(payloads, { onConflict: "id" });
-  if (error && isInputStatusSchemaError(error.message)) {
-    const stripped = payloads.map((payload) => {
-      const { input_status, input_on, ...rest } = payload;
-      void input_status;
-      void input_on;
-      return rest;
-    });
-    ({ error } = await supabase.from("purchases").upsert(stripped, { onConflict: "id" }));
+  while (error) {
+    const stripped = payloads.map((payload) => stripPurchaseSchema(payload, error!.message) ?? payload);
+    const changed = stripped.some((payload, i) => payload !== payloads[i]);
+    if (!changed) break;
+    payloads = stripped;
+    ({ error } = await supabase.from("purchases").upsert(payloads, { onConflict: "id" }));
     if (!error) {
       await clearPurchaseDirty(db, rows);
-      return { error: null, hint: INPUT_STATUS_HINT, wrote: true };
+      return { error: null, hint: SCHEMA_HINT, wrote: true };
     }
   }
   if (!error) {
@@ -424,7 +524,7 @@ async function upsertPurchaseChunk(
   const ok: LocalPurchase[] = [];
   for (const row of rows) {
     const result = await upsertPurchase(supabase, row);
-    if (result.error === INPUT_STATUS_HINT) {
+    if (result.error === SCHEMA_HINT) {
       hint = result.error;
       ok.push(row);
       continue;
@@ -502,7 +602,10 @@ async function deleteIds(
 export async function pushDirty(
   db: GstDB,
   supabase: SupabaseClient,
+  mode: "deletes" | "upserts" | "all" = "all",
 ): Promise<{ error: string | null; missingSuppliersTable: boolean; wrote: boolean }> {
+  const doDeletes = mode === "deletes" || mode === "all";
+  const doUpserts = mode === "upserts" || mode === "all";
   let hint: string | null = null;
   let wrote = false;
   let missingSuppliersTable = (await db.meta.get("missingSuppliers"))?.value === "1";
@@ -512,24 +615,26 @@ export async function pushDirty(
     const dead = dirtySuppliers.filter((row) => row.deleted);
     const live = dirtySuppliers.filter((row) => !row.deleted);
 
-    for (let i = 0; i < dead.length; i += UPSERT_CHUNK) {
-      const chunk = dead.slice(i, i + UPSERT_CHUNK);
-      const result = await deleteIds(
-        supabase,
-        "suppliers",
-        chunk.map((row) => row.id),
-      );
-      if (result.missingTable) {
-        missingSuppliersTable = true;
-        break;
-      }
-      if (result.error) return { error: result.error, missingSuppliersTable, wrote };
-      for (const row of chunk) {
-        if (await removeIfStillDeleted(db.suppliers, row.id)) wrote = true;
+    if (doDeletes) {
+      for (let i = 0; i < dead.length; i += UPSERT_CHUNK) {
+        const chunk = dead.slice(i, i + UPSERT_CHUNK);
+        const result = await deleteIds(
+          supabase,
+          "suppliers",
+          chunk.map((row) => row.id),
+        );
+        if (result.missingTable) {
+          missingSuppliersTable = true;
+          break;
+        }
+        if (result.error) return { error: result.error, missingSuppliersTable, wrote };
+        for (const row of chunk) {
+          if (await removeIfStillDeleted(db.suppliers, row.id)) wrote = true;
+        }
       }
     }
 
-    if (!missingSuppliersTable) {
+    if (doUpserts && !missingSuppliersTable) {
       for (let i = 0; i < live.length; i += UPSERT_CHUNK) {
         const chunk = live.slice(i, i + UPSERT_CHUNK);
         const result = await upsertSupplierChunk(supabase, db, chunk);
@@ -550,41 +655,45 @@ export async function pushDirty(
   const deadPurchases = dirtyPurchases.filter((row) => row.deleted);
   const livePurchases = dirtyPurchases.filter((row) => !row.deleted);
 
-  for (let i = 0; i < deadPurchases.length; i += UPSERT_CHUNK) {
-    const chunk = deadPurchases.slice(i, i + UPSERT_CHUNK);
-    const result = await deleteIds(
-      supabase,
-      "purchases",
-      chunk.map((row) => row.id),
-    );
-    if (result.error) return { error: result.error, missingSuppliersTable, wrote };
-    for (const row of chunk) {
-      if (await removeIfStillDeleted(db.purchases, row.id)) wrote = true;
+  if (doDeletes) {
+    for (let i = 0; i < deadPurchases.length; i += UPSERT_CHUNK) {
+      const chunk = deadPurchases.slice(i, i + UPSERT_CHUNK);
+      const result = await deleteIds(
+        supabase,
+        "purchases",
+        chunk.map((row) => row.id),
+      );
+      if (result.error) return { error: result.error, missingSuppliersTable, wrote };
+      for (const row of chunk) {
+        if (await removeIfStillDeleted(db.purchases, row.id)) wrote = true;
+      }
     }
   }
 
-  for (let i = 0; i < livePurchases.length; i += UPSERT_CHUNK) {
-    const chunk = livePurchases.slice(i, i + UPSERT_CHUNK);
-    const result = await upsertPurchaseChunk(supabase, db, chunk);
-    if (result.hint) hint = result.hint;
-    if (result.error) return { error: result.error, missingSuppliersTable, wrote };
-    if (result.wrote) wrote = true;
-  }
+  if (doUpserts) {
+    for (let i = 0; i < livePurchases.length; i += UPSERT_CHUNK) {
+      const chunk = livePurchases.slice(i, i + UPSERT_CHUNK);
+      const result = await upsertPurchaseChunk(supabase, db, chunk);
+      if (result.hint) hint = result.hint;
+      if (result.error) return { error: result.error, missingSuppliersTable, wrote };
+      if (result.wrote) wrote = true;
+    }
 
-  const dirtyProfiles = (await db.profile.toArray()).filter((row) => row.dirty);
-  for (const row of dirtyProfiles) {
-    const { dirty, ...payload } = row;
-    void dirty;
-    const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
-    if (error) return { error: error.message, missingSuppliersTable, wrote };
-    const current = await db.profile.get(row.id);
-    if (
-      current?.dirty &&
-      current.business_name === row.business_name &&
-      current.gstin === row.gstin
-    ) {
-      await db.profile.update(row.id, { dirty: 0 });
-      wrote = true;
+    const dirtyProfiles = (await db.profile.toArray()).filter((row) => row.dirty);
+    for (const row of dirtyProfiles) {
+      const { dirty, ...payload } = row;
+      void dirty;
+      const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
+      if (error) return { error: error.message, missingSuppliersTable, wrote };
+      const current = await db.profile.get(row.id);
+      if (
+        current?.dirty &&
+        current.business_name === row.business_name &&
+        current.gstin === row.gstin
+      ) {
+        await db.profile.update(row.id, { dirty: 0 });
+        wrote = true;
+      }
     }
   }
 
@@ -600,11 +709,30 @@ export async function runSync(
     return { error: null, missingSuppliersTable: false, changed: false };
   }
 
-  const pushed = await pushDirty(db, supabase);
+  const deleted = await pushDirty(db, supabase, "deletes");
+  if (deleted.error && !deleted.wrote) {
+    return {
+      error: deleted.error,
+      missingSuppliersTable: deleted.missingSuppliersTable,
+      changed: false,
+    };
+  }
+
+  const purchaseReconcile = await applyIdReconcile(db, "purchases", userId, supabase);
+  const supplierReconcile = deleted.missingSuppliersTable
+    ? { changed: false, missingTable: true }
+    : await applyIdReconcile(db, "suppliers", userId, supabase);
+
+  const pushed = await pushDirty(db, supabase, "upserts");
   const seeded = (await db.meta.get("seeded"))?.value === "1";
   const lastFull = Number((await db.meta.get("lastFullPull"))?.value || 0);
   const lastRemoteAt = (await db.meta.get("lastRemoteAt"))?.value ?? null;
   const needFull = !seeded || !lastRemoteAt || Date.now() - lastFull > FULL_PULL_MS;
+  const missingSuppliersTable =
+    pushed.missingSuppliersTable ||
+    deleted.missingSuppliersTable ||
+    supplierReconcile.missingTable;
+  const reconcileChanged = purchaseReconcile.changed || supplierReconcile.changed;
 
   if (needFull) {
     const remote = await pullAll(supabase, userId);
@@ -612,10 +740,20 @@ export async function runSync(
     const watermark = maxUpdated([...remote.purchases, ...remote.suppliers]) ?? nowIso();
     await db.meta.put({ key: "lastFullPull", value: String(Date.now()) });
     await db.meta.put({ key: "lastRemoteAt", value: watermark });
+    await db.meta.put({
+      key: "seenPurchaseIds",
+      value: JSON.stringify(remote.purchases.map((row) => row.id)),
+    });
+    if (!remote.missingSuppliersTable) {
+      await db.meta.put({
+        key: "seenSupplierIds",
+        value: JSON.stringify(remote.suppliers.map((row) => row.id)),
+      });
+    }
     return {
-      error: pushed.error,
-      missingSuppliersTable: remote.missingSuppliersTable || pushed.missingSuppliersTable,
-      changed: pushed.wrote || merged,
+      error: pushed.error ?? deleted.error,
+      missingSuppliersTable: remote.missingSuppliersTable || missingSuppliersTable,
+      changed: pushed.wrote || deleted.wrote || merged || reconcileChanged,
     };
   }
 
@@ -626,9 +764,9 @@ export async function runSync(
     await db.meta.put({ key: "lastRemoteAt", value: watermark });
   }
   return {
-    error: pushed.error,
-    missingSuppliersTable: remote.missingSuppliersTable || pushed.missingSuppliersTable,
-    changed: pushed.wrote || merged,
+    error: pushed.error ?? deleted.error,
+    missingSuppliersTable: remote.missingSuppliersTable || missingSuppliersTable,
+    changed: pushed.wrote || deleted.wrote || merged || reconcileChanged,
   };
 }
 
@@ -672,6 +810,22 @@ export function purchaseFromInput(
       input.payment_status === "paid" ? input.payment_date || input.invoice_date : null,
     place_of_supply: input.place_of_supply?.trim() || null,
     notes: input.notes?.trim() || null,
+    lines: (input.lines && input.lines.length > 0
+      ? input.lines
+      : decodeLines({
+          notes: input.notes,
+          taxable_value: input.taxable_value,
+          gst_rate: input.gst_rate,
+          invoice_total: input.invoice_total,
+          cgst: input.cgst,
+          sgst: input.sgst,
+          igst: input.igst,
+        })
+    ).map((line) => ({
+      taxable: line.taxable,
+      rate: line.rate,
+      gst: line.gst,
+    })),
     supplier_id: input.supplier_id || null,
     input_status: input.input_status ?? "waiting",
     input_on: input.input_on ?? null,

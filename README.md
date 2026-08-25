@@ -4,23 +4,47 @@ Mobile-first web app to log GST purchases, see how much tax you paid, and hand a
 
 ## What it does
 
-- Add a bill in under a minute: date, supplier, invoice, taxable value
-- Auto-splits CGST + SGST or IGST from GSTIN + rate
-- Tracks ITC eligibility, reverse charge, unpaid bills, missing GSTIN
+- Add a bill in under a minute: date, supplier, invoice, GST-inclusive amount
+- Splits CGST + SGST or IGST from your GSTIN vs the supplier’s GSTIN
+- Tracks whether input has shown up in GSTR-2B (Waiting / Got / No)
 - Month and financial-year totals
-- CSV import / export and a CA-ready PDF register
-- Email login, data in your Supabase project, dark mode
+- CA-ready PDF register with CGST / SGST / IGST columns
+- Email login, data in your Supabase project, dark mode, offline copy on the device
+
+CSV import/export helpers exist in code but are not on the Reports screen yet.
 
 ## Setup
 
-### 1. Supabase
+### 1. Supabase (CLI)
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. SQL Editor → paste and run `supabase/schema.sql`
-3. Authentication → URL configuration:
-   - Site URL: `http://localhost:3000` (later your Vercel URL)
-   - Redirect URLs: `http://localhost:3000/auth/callback` and `https://YOUR-APP.vercel.app/auth/callback`
-4. Optional: Authentication → Providers → Email → turn **Confirm email** off while you test
+Install the [Supabase CLI](https://supabase.com/docs/guides/cli), then from this repo:
+
+```bash
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+```
+
+**New project:** push every migration.
+
+```bash
+npx supabase db push
+```
+
+**Existing project** that already ran the old SQL editor scripts (`schema.sql` / `suppliers.sql` / `input-status.sql`): mark the baseline as already applied, then push the tax-lines migration only.
+
+```bash
+npx supabase migration repair --status applied 20260825173332
+npx supabase db push
+```
+
+That second migration adds `purchases.lines`, repairs intra-state bills that were stored as all-IGST, constrains `input_status`, and moves `handle_new_user` out of `public`.
+
+Authentication → URL configuration:
+
+- Site URL: `http://localhost:3000` (later your Vercel URL)
+- Redirect URLs: `http://localhost:3000/auth/callback` and `https://YOUR-APP.vercel.app/auth/callback`
+
+Optional: Authentication → Providers → Email → turn **Confirm email** off while you test.
 
 ### 2. App
 
@@ -36,6 +60,10 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000), create an account, add your GSTIN in Settings, then log a purchase.
+
+```bash
+npm test
+```
 
 ### 3. Vercel
 
@@ -63,15 +91,9 @@ The app installs as a standalone home-screen app. A service worker caches the sh
 
 ## CA workflow
 
-1. Log bills through the month (or import a CSV from Reports)
+1. Log bills through the month
 2. Open **Reports** → this month or this FY
-3. Download PDF for the CA, and CSV as a backup
-4. Flag **No GSTIN** and **Unpaid** before filing — those are the usual GSTR-2B mismatches
+3. Download PDF for the CA
+4. Flag **No** and **Waiting** before filing — those are the usual GSTR-2B mismatches
 
-CSV template is on the Reports screen. Column names can be `invoice_date`, `supplier_name`, `taxable_value`, `gst_rate`, and so on; common aliases like `vendor name` and `purchaser` also work.
-
-## Suppliers (existing projects)
-
-If you already ran `schema.sql` before suppliers existed, also run `supabase/suppliers.sql` once in the SQL editor. That saves a supplier directory, backfills parties from old bills, and links history.
-
-To track **Got input** vs waiting, run `supabase/input-status.sql` once as well.
+Schema source of truth is `supabase/migrations/`. The SQL files in `supabase/*.sql` are pointers only.

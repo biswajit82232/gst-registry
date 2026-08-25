@@ -73,7 +73,7 @@ export function SupplierForm({
           spellCheck={false}
           value={gstin}
           onChange={(e) => setGstin(e.target.value.toUpperCase())}
-          placeholder="27AAAAA0000A1Z5"
+          placeholder="15-character GSTIN"
         />
       </Field>
       <Field label="Phone">

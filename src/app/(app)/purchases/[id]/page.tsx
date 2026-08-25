@@ -123,6 +123,20 @@ export default function PurchaseDetailPage() {
         <p className="text-[14px] text-muted">GST {formatInr(gst)}</p>
       ) : null}
 
+      {gst > 0 ? (
+        <p className="tabular text-[13px] text-muted">
+          {purchase.tax_type === "inter" ? (
+            <>IGST {formatInr(purchase.igst)}</>
+          ) : (
+            <>
+              CGST {formatInr(purchase.cgst)}
+              <span className="mx-1.5 text-line">·</span>
+              SGST {formatInr(purchase.sgst)}
+            </>
+          )}
+        </p>
+      ) : null}
+
       <StatusPicker value={purchase.input_status} onChange={(status) => !busy && void mark(status)} />
       {hint ? <Alert tone="danger">{hint}</Alert> : null}
 

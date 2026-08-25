@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatDate } from "./format";
 import { decodeLines, totalsOf } from "./gst";
-import { gstOf, inputLabel } from "./input";
+import { inputLabel } from "./input";
 import type { Profile, Purchase } from "./types";
 
 const INK: [number, number, number] = [26, 25, 22];
@@ -118,7 +118,9 @@ function billBody(rows: Purchase[]) {
     row.supplier_gstin || "—",
     rateLabel(row),
     money(row.taxable_value),
-    money(gstOf(row)),
+    money(row.cgst),
+    money(row.sgst),
+    money(row.igst),
     money(row.invoice_total),
     inputLabel(row.input_status),
   ]);
@@ -165,28 +167,32 @@ function billTable(doc: jsPDF, rows: Purchase[], startY: number) {
     },
     headStyles: { ...tableBase.headStyles, fontSize: 7.5 },
     footStyles: { ...tableBase.footStyles, fontSize: 7.5 },
-    head: [["#", "Date", "Invoice", "Party", "GSTIN", "Rate", "Taxable", "GST", "Total", "Input"]],
+    head: [["#", "Date", "Invoice", "Party", "GSTIN", "Rate", "Taxable", "CGST", "SGST", "IGST", "Total", "Input"]],
     body: billBody(rows),
     foot: [
       [
         { content: `${totals.count} bills`, colSpan: 6, styles: { halign: "left" } },
         money(totals.taxable),
-        money(totals.gst),
+        money(totals.cgst),
+        money(totals.sgst),
+        money(totals.igst),
         money(totals.total),
         `${totals.gotCount} got`,
       ],
     ],
     columnStyles: {
-      0: { cellWidth: 11, halign: "right" },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 60, overflow: "linebreak" },
-      4: { cellWidth: 38, fontSize: 7 },
-      5: { cellWidth: 20, halign: "right" },
-      6: { cellWidth: 27, halign: "right" },
-      7: { cellWidth: 24, halign: "right" },
-      8: { cellWidth: 27, halign: "right" },
-      9: { cellWidth: 16, halign: "center" },
+      0: { cellWidth: 10, halign: "right" },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 46, overflow: "linebreak" },
+      4: { cellWidth: 32, fontSize: 6.5 },
+      5: { cellWidth: 16, halign: "right" },
+      6: { cellWidth: 22, halign: "right" },
+      7: { cellWidth: 18, halign: "right" },
+      8: { cellWidth: 18, halign: "right" },
+      9: { cellWidth: 18, halign: "right" },
+      10: { cellWidth: 22, halign: "right" },
+      11: { cellWidth: 14, halign: "center" },
     },
   });
 }
@@ -275,7 +281,9 @@ export function downloadPurchasePdf(
   const kpi = [
     `${totals.count} bills`,
     `Taxable  ${money(totals.taxable)}`,
-    `GST  ${money(totals.gst)}`,
+    `CGST  ${money(totals.cgst)}`,
+    `SGST  ${money(totals.sgst)}`,
+    `IGST  ${money(totals.igst)}`,
     `Total  ${money(totals.total)}`,
     `Got  ${money(totals.gotGst)}`,
     `Waiting  ${money(totals.waitingGst)}`,

@@ -1,7 +1,11 @@
-import type { Purchase, PurchaseInput, PurchaseTotals, TaxType } from "./types";
+import type { BillLine, Purchase, PurchaseInput, PurchaseTotals, TaxType } from "./types";
+
+export type { BillLine };
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
 export const DEFAULT_GST_RATE = 5;
+
+export const LINES_PREFIX = "GSTLINES:";
 
 export function nextUnusedRate(used: Iterable<number>): number {
   const set = new Set(used);
@@ -11,33 +15,55 @@ export function nextUnusedRate(used: Iterable<number>): number {
   return DEFAULT_GST_RATE;
 }
 
-export type BillLine = { taxable: number; rate: number };
-
-const LINES_PREFIX = "GSTLINES:";
-
-export function lineGst(line: BillLine): number {
-  return round2((toNumber(line.taxable) * toNumber(line.rate)) / 100);
+export function toNumber(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const n = Number(value.replace(/,/g, "").trim());
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
 }
 
-export function lineTotal(line: BillLine): number {
-  return round2(toNumber(line.taxable) + lineGst(line));
-}
-
-export function taxableFromInclusive(inclusive: number, rate: number): number {
-  const factor = 1 + toNumber(rate) / 100;
-  if (factor <= 0) return 0;
-  return round2(Math.max(0, toNumber(inclusive) / factor));
-}
-
-export function lineFromInclusive(inclusive: number, rate: number): BillLine {
-  const r = toNumber(rate);
-  return { taxable: taxableFromInclusive(inclusive, r), rate: r };
+export function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 function parseRate(value: unknown): number {
   if (value == null || value === "") return 18;
   const n = toNumber(value);
   return n < 0 ? 18 : n;
+}
+
+export function gstFromInclusive(inclusive: number, rate: number): number {
+  const inc = round2(Math.max(0, toNumber(inclusive)));
+  const r = toNumber(rate);
+  if (r <= 0 || inc <= 0) return 0;
+  return round2((inc * r) / (100 + r));
+}
+
+export function lineGst(line: BillLine): number {
+  if (line.gst != null && Number.isFinite(line.gst)) return round2(toNumber(line.gst));
+  const r = toNumber(line.rate);
+  if (r <= 0) return 0;
+  return round2((toNumber(line.taxable) * r) / 100);
+}
+
+export function lineTotal(line: BillLine): number {
+  return round2(toNumber(line.taxable) + lineGst(line));
+}
+
+export function lineFromInclusive(inclusive: number, rate: number): BillLine {
+  const r = toNumber(rate);
+  const inc = round2(Math.max(0, toNumber(inclusive)));
+  const gst = gstFromInclusive(inc, r);
+  return { taxable: round2(inc - gst), rate: r, gst };
+}
+
+export function normalizeLine(line: BillLine): BillLine {
+  const rate = parseRate(line.rate);
+  const taxable = round2(toNumber(line.taxable));
+  const gst = line.gst != null && Number.isFinite(line.gst) ? round2(toNumber(line.gst)) : round2((taxable * rate) / 100);
+  return { taxable, rate, gst };
 }
 
 function extraNoteFrom(raw: string): string | undefined {
@@ -53,13 +79,65 @@ function extraNoteFrom(raw: string): string | undefined {
   return undefined;
 }
 
+export function humanNotes(raw?: string | null): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  if (!s.startsWith(LINES_PREFIX)) return s;
+  return extraNoteFrom(s) ?? null;
+}
+
+function parseLineRow(row: Record<string, unknown>): BillLine | null {
+  const taxable = toNumber(row.taxable ?? row.a);
+  const rate = parseRate(row.rate ?? row.r);
+  const gstRaw = row.gst ?? row.g;
+  const gst = gstRaw == null || gstRaw === "" ? round2((taxable * rate) / 100) : round2(toNumber(gstRaw));
+  if (taxable <= 0 && gst <= 0 && rate < 0) return null;
+  return { taxable, rate, gst };
+}
+
+export function parseLinesColumn(value: unknown): BillLine[] {
+  if (!value) return [];
+  let rows: unknown = value;
+  if (typeof value === "string") {
+    try {
+      rows = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => (row && typeof row === "object" ? parseLineRow(row as Record<string, unknown>) : null))
+    .filter((line): line is BillLine => line != null);
+}
+
+function linesFromNotesPayload(raw: string): BillLine[] {
+  if (!raw.startsWith(LINES_PREFIX)) return [];
+  try {
+    const parsed = JSON.parse(raw.slice(LINES_PREFIX.length)) as
+      | Array<Record<string, unknown>>
+      | { items?: Array<Record<string, unknown>> };
+    const rows = Array.isArray(parsed) ? parsed : parsed.items;
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    return rows
+      .map((row) => parseLineRow(row))
+      .filter((line): line is BillLine => line != null);
+  } catch {
+    return [];
+  }
+}
+
 export function encodeLines(lines: BillLine[], previousNotes?: string | null): string {
-  const items = lines.map((line) => ({ a: round2(toNumber(line.taxable)), r: parseRate(line.rate) }));
+  const items = lines.map((line) => {
+    const n = normalizeLine(line);
+    return { a: n.taxable, r: n.rate, g: n.gst };
+  });
   const extra = extraNoteFrom(previousNotes ?? "");
   return LINES_PREFIX + JSON.stringify(extra ? { v: 1, items, n: extra } : items);
 }
 
 export function decodeLines(purchase: {
+  lines?: BillLine[] | unknown;
   notes?: string | null;
   taxable_value: number;
   gst_rate: number;
@@ -68,20 +146,12 @@ export function decodeLines(purchase: {
   sgst?: number;
   igst?: number;
 }): BillLine[] {
-  const raw = purchase.notes ?? "";
-  if (raw.startsWith(LINES_PREFIX)) {
-    try {
-      const parsed = JSON.parse(raw.slice(LINES_PREFIX.length)) as
-        | Array<{ a?: number; r?: number }>
-        | { items?: Array<{ a?: number; r?: number }> };
-      const rows = Array.isArray(parsed) ? parsed : parsed.items;
-      if (Array.isArray(rows) && rows.length > 0) {
-        return rows.map((row) => ({ taxable: toNumber(row.a), rate: parseRate(row.r) }));
-      }
-    } catch {
-      /* fall through */
-    }
-  }
+  const fromColumn = parseLinesColumn(purchase.lines);
+  if (fromColumn.length > 0) return fromColumn.map(normalizeLine);
+
+  const fromNotes = linesFromNotesPayload(purchase.notes ?? "");
+  if (fromNotes.length > 0) return fromNotes.map(normalizeLine);
+
   const gst = toNumber(purchase.cgst) + toNumber(purchase.sgst) + toNumber(purchase.igst);
   let taxable = toNumber(purchase.taxable_value);
   if (taxable <= 0 && toNumber(purchase.invoice_total) > 0) {
@@ -95,7 +165,7 @@ export function decodeLines(purchase: {
   } else if (taxable > 0 && gst > 0) {
     rate = (gst / taxable) * 100;
   }
-  return [{ taxable, rate }];
+  return [normalizeLine({ taxable, rate, gst })];
 }
 
 export function totalsFromLines(lines: BillLine[]): {
@@ -104,9 +174,10 @@ export function totalsFromLines(lines: BillLine[]): {
   invoice_total: number;
   gst_rate: number;
 } {
-  const taxable_value = round2(lines.reduce((sum, line) => sum + toNumber(line.taxable), 0));
-  const gst = round2(lines.reduce((sum, line) => sum + lineGst(line), 0));
-  const main = lines.slice().sort((a, b) => toNumber(b.taxable) - toNumber(a.taxable))[0];
+  const use = lines.map(normalizeLine);
+  const taxable_value = round2(use.reduce((sum, line) => sum + toNumber(line.taxable), 0));
+  const gst = round2(use.reduce((sum, line) => sum + lineGst(line), 0));
+  const main = use.slice().sort((a, b) => toNumber(b.taxable) - toNumber(a.taxable))[0];
   const mainRate = main ? parseRate(main.rate) : 18;
   return {
     taxable_value,
@@ -116,31 +187,53 @@ export function totalsFromLines(lines: BillLine[]): {
   };
 }
 
+export function splitTax(
+  gst: number,
+  taxType: TaxType,
+): { cgst: number; sgst: number; igst: number } {
+  const amount = round2(toNumber(gst));
+  if (taxType === "inter") return { cgst: 0, sgst: 0, igst: amount };
+  const half = round2(amount / 2);
+  return { cgst: half, sgst: round2(amount - half), igst: 0 };
+}
+
 export function applyLinesToInput<T extends {
   taxable_value: number;
   invoice_total: number;
   gst_rate: number;
+  tax_type: TaxType;
   cgst: number;
   sgst: number;
   igst: number;
   cess: number;
   notes: string | null;
   itc_eligible: boolean;
+  lines?: BillLine[];
 }>(form: T, lines: BillLine[]): T {
-  const kept = lines.filter((line) => toNumber(line.taxable) > 0);
-  const use = kept.length > 0 ? kept : lines;
+  const kept = lines.map(normalizeLine).filter((line) => toNumber(line.taxable) > 0 || lineGst(line) > 0);
+  const use = kept.length > 0 ? kept : lines.map(normalizeLine);
   const totals = totalsFromLines(use);
+  const cess = round2(toNumber(form.cess));
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
+  for (const line of use) {
+    const split = splitTax(lineGst(line), form.tax_type);
+    cgst += split.cgst;
+    sgst += split.sgst;
+    igst += split.igst;
+  }
   return {
     ...form,
     taxable_value: totals.taxable_value,
-    invoice_total: totals.invoice_total,
+    invoice_total: round2(totals.invoice_total + cess),
     gst_rate: totals.gst_rate,
-    cgst: 0,
-    sgst: 0,
-    igst: totals.gst,
-    cess: 0,
-    notes: encodeLines(use, form.notes),
-    itc_eligible: true,
+    cgst: round2(cgst),
+    sgst: round2(sgst),
+    igst: round2(igst),
+    cess,
+    notes: humanNotes(form.notes),
+    lines: use,
   };
 }
 
@@ -187,22 +280,29 @@ export const STATE_CODES: Record<string, string> = {
 const GSTIN_RE =
   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
-export function toNumber(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
-    const n = Number(value.replace(/,/g, "").trim());
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-}
+const GSTIN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+export function gstinCheckDigit(body14: string): string {
+  const input = body14.trim().toUpperCase();
+  let factor = 2;
+  let sum = 0;
+  const mod = GSTIN_CHARS.length;
+  for (let i = input.length - 1; i >= 0; i--) {
+    const codePoint = GSTIN_CHARS.indexOf(input[i]);
+    if (codePoint < 0) return "";
+    let digit = factor * codePoint;
+    factor = factor === 2 ? 1 : 2;
+    digit = Math.floor(digit / mod) + (digit % mod);
+    sum += digit;
+  }
+  const check = (mod - (sum % mod)) % mod;
+  return GSTIN_CHARS[check];
 }
 
 export function isValidGstin(gstin: string): boolean {
   const v = gstin.trim().toUpperCase();
-  return GSTIN_RE.test(v);
+  if (!GSTIN_RE.test(v)) return false;
+  return gstinCheckDigit(v.slice(0, 14)) === v[14];
 }
 
 export function gstinState(gstin: string | null | undefined): string | null {
@@ -234,25 +334,10 @@ export function calcGst(input: {
   const rate = toNumber(input.gstRate);
   const gst = round2((taxable * rate) / 100);
   const cess = round2(toNumber(input.cess));
-
-  if (input.taxType === "inter") {
-    return {
-      taxable_value: taxable,
-      cgst: 0,
-      sgst: 0,
-      igst: gst,
-      cess,
-      invoice_total: round2(taxable + gst + cess),
-    };
-  }
-
-  const half = round2(gst / 2);
-  const other = round2(gst - half);
+  const split = splitTax(gst, input.taxType);
   return {
     taxable_value: taxable,
-    cgst: half,
-    sgst: other,
-    igst: 0,
+    ...split,
     cess,
     invoice_total: round2(taxable + gst + cess),
   };
@@ -266,15 +351,17 @@ export function fromInvoiceTotal(input: {
 }): ReturnType<typeof calcGst> {
   const rate = toNumber(input.gstRate);
   const cess = round2(toNumber(input.cess));
-  const factor = 1 + rate / 100;
-  const taxable =
-    factor <= 0 ? 0 : round2(Math.max(0, (toNumber(input.invoiceTotal) - cess) / factor));
-  return calcGst({
-    taxableValue: taxable,
-    gstRate: rate,
-    taxType: input.taxType,
+  const inc = round2(Math.max(0, toNumber(input.invoiceTotal)));
+  const net = round2(Math.max(0, inc - cess));
+  const gst = gstFromInclusive(net, rate);
+  const taxable = round2(net - gst);
+  const split = splitTax(gst, input.taxType);
+  return {
+    taxable_value: taxable,
+    ...split,
     cess,
-  });
+    invoice_total: inc,
+  };
 }
 
 export function emptyPurchase(ownGstin?: string | null): PurchaseInput {
@@ -298,6 +385,7 @@ export function emptyPurchase(ownGstin?: string | null): PurchaseInput {
     payment_date: iso,
     place_of_supply: gstinState(ownGstin) ?? "",
     notes: "",
+    lines: [{ taxable: 0, rate: DEFAULT_GST_RATE, gst: 0 }],
     supplier_id: null,
     input_status: "waiting",
     input_on: null,
@@ -355,6 +443,17 @@ export function totalsOf(rows: Purchase[]): PurchaseTotals {
 }
 
 export function normalizePurchase(row: Record<string, unknown>): Purchase {
+  const notesRaw = row.notes ? String(row.notes) : null;
+  const lines = decodeLines({
+    lines: row.lines,
+    notes: notesRaw,
+    taxable_value: toNumber(row.taxable_value),
+    gst_rate: toNumber(row.gst_rate),
+    invoice_total: toNumber(row.invoice_total),
+    cgst: toNumber(row.cgst),
+    sgst: toNumber(row.sgst),
+    igst: toNumber(row.igst),
+  });
   return {
     id: String(row.id),
     user_id: String(row.user_id),
@@ -378,7 +477,8 @@ export function normalizePurchase(row: Record<string, unknown>): Purchase {
     payment_status: row.payment_status === "unpaid" ? "unpaid" : "paid",
     payment_date: row.payment_date ? String(row.payment_date) : null,
     place_of_supply: row.place_of_supply ? String(row.place_of_supply) : null,
-    notes: row.notes ? String(row.notes) : null,
+    notes: humanNotes(notesRaw),
+    lines,
     supplier_id: row.supplier_id ? String(row.supplier_id) : null,
     input_status:
       row.input_status === "got" || row.input_status === "missing" ? row.input_status : "waiting",

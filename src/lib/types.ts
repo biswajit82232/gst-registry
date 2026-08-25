@@ -3,6 +3,12 @@ export type TaxType = "intra" | "inter";
 export type PaymentStatus = "paid" | "unpaid";
 export type InputStatus = "waiting" | "got" | "missing";
 
+export type BillLine = {
+  taxable: number;
+  rate: number;
+  gst?: number;
+};
+
 export type Profile = {
   id: string;
   business_name: string | null;
@@ -35,6 +41,7 @@ export type Purchase = {
   payment_date: string | null;
   place_of_supply: string | null;
   notes: string | null;
+  lines: BillLine[];
   supplier_id: string | null;
   input_status: InputStatus;
   input_on: string | null;

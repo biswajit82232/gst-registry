@@ -1,5 +1,5 @@
 import Papa from "papaparse";
-import { calcGst, isValidGstin, toNumber } from "./gst";
+import { calcGst, gstinCheckDigit, humanNotes, isValidGstin, toNumber } from "./gst";
 import { parseInputStatus } from "./input";
 import type { Purchase, PurchaseInput, TaxType } from "./types";
 
@@ -108,7 +108,7 @@ export function purchasesToCsv(rows: Purchase[]): string {
     payment_status: row.payment_status,
     payment_date: row.payment_date ?? "",
     place_of_supply: row.place_of_supply ?? "",
-    notes: row.notes ?? "",
+    notes: humanNotes(row.notes) ?? "",
     input_status: row.input_status,
   }));
   return Papa.unparse(data, { columns: [...CSV_COLUMNS] });
@@ -121,7 +121,7 @@ export function csvTemplate(): string {
         invoice_date: "2026-08-01",
         invoice_number: "INV-101",
         supplier_name: "Acme Traders",
-        supplier_gstin: "27AAAAA0000A1Z5",
+        supplier_gstin: `27AAAAA0000A1Z${gstinCheckDigit("27AAAAA0000A1Z")}`,
         purchased_by: "Self",
         category: "goods",
         hsn_sac: "8471",
@@ -216,7 +216,16 @@ export function parsePurchaseCsv(text: string): {
       payment_status: String(raw.payment_status ?? "").toLowerCase() === "unpaid" ? "unpaid" : "paid",
       payment_date: parseDate(raw.payment_date) || invoice_date,
       place_of_supply: String(raw.place_of_supply ?? "").trim(),
-      notes: String(raw.notes ?? "").trim(),
+      notes: humanNotes(String(raw.notes ?? "").trim()) ?? "",
+      lines: [
+        {
+          taxable,
+          rate,
+          gst: (hasTax && raw.cgst !== "" ? toNumber(raw.cgst) : computed.cgst)
+            + (hasTax && raw.sgst !== "" ? toNumber(raw.sgst) : computed.sgst)
+            + (hasTax && raw.igst !== "" ? toNumber(raw.igst) : computed.igst),
+        },
+      ],
       supplier_id: null,
       input_status: parseInputStatus(raw.input_status),
       input_on: null,

@@ -62,7 +62,7 @@ export default function SettingsPage() {
             autoCapitalize="characters"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="27AAAAA0000A1Z5"
+            placeholder="15-character GSTIN"
           />
         </Field>
         <p className="text-[13px] text-muted">{profile?.email || userEmail}</p>

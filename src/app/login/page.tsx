@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Suspense, useActionState, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SetupScreen } from "@/components/setup-screen";
@@ -10,11 +11,14 @@ import { authenticate, type AuthState } from "./actions";
 
 const initial: AuthState = { error: "", info: "" };
 
-export default function LoginPage() {
+function LoginForm() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [state, action, pending] = useActionState(authenticate, initial);
-
-  if (!isSupabaseConfigured()) return <SetupScreen />;
+  const params = useSearchParams();
+  const linkError =
+    params.get("error") === "auth"
+      ? "That sign-in link expired or was already used. Try again."
+      : "";
 
   return (
     <div className="app-root safe-x flex min-h-dvh flex-col bg-bg pb-[max(2.5rem,env(safe-area-inset-bottom,0px))]">
@@ -52,7 +56,7 @@ export default function LoginPage() {
                 className={inputClass()}
               />
             </Field>
-            {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+            {state.error || linkError ? <Alert tone="danger">{state.error || linkError}</Alert> : null}
             {state.info ? <p className="text-[13px] text-muted">{state.info}</p> : null}
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Please wait…" : mode === "in" ? "Sign in" : "Create account"}
@@ -68,5 +72,15 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  if (!isSupabaseConfigured()) return <SetupScreen />;
+
+  return (
+    <Suspense fallback={<div className="app-root min-h-dvh bg-bg" />}>
+      <LoginForm />
+    </Suspense>
   );
 }
