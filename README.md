@@ -39,12 +39,27 @@ Open [http://localhost:3000](http://localhost:3000), create an account, add your
 
 ### 3. Vercel
 
-1. Push this repo and import it in Vercel
-2. Add the same two `NEXT_PUBLIC_SUPABASE_*` env vars
-3. Deploy
-4. Put the production URL into Supabase Site URL / Redirect URLs
+1. Open [vercel.com](https://vercel.com) and sign in with GitHub.
+2. **Add New… → Project** → import `biswajit82232/gst-registry`.
+3. Leave Framework Preset as **Next.js**. Root Directory blank.
+4. **Environment Variables** (Production, Preview, and Development):
 
-Your data stays in Supabase (Postgres + auth). The Vercel app is only the UI.
+   | Name | Value |
+   | --- | --- |
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://YOUR-PROJECT.supabase.co` |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the anon / publishable key from Supabase → Settings → API |
+
+5. Click **Deploy**. Copy the URL, e.g. `https://gst-registry.vercel.app`.
+6. In Supabase → Authentication → URL configuration:
+   - **Site URL:** `https://gst-registry.vercel.app`
+   - **Redirect URLs:** `https://gst-registry.vercel.app/auth/callback` and `http://localhost:3000/auth/callback`
+7. Open the Vercel URL on your phone (HTTPS is required for PWA). Chrome / Edge: menu → **Install app**. iPhone Safari: Share → **Add to Home Screen**.
+
+Your data stays in Supabase. Vercel only hosts the UI. After the first visit, bills already on the phone still open if the network drops.
+
+### PWA
+
+The app installs as a standalone home-screen app. A service worker caches the shell; purchase data already lives in IndexedDB on the device. Install from **Settings** after you deploy.
 
 ## CA workflow
 

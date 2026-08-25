@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InstallCard } from "@/components/pwa";
 import { Alert, Button, Field, inputClass } from "@/components/ui";
 import { gstinState, isValidGstin } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
@@ -74,6 +75,8 @@ export default function SettingsPage() {
           {saving ? "Saving…" : "Save profile"}
         </Button>
       </form>
+
+      <InstallCard />
 
       <div className="flex items-center justify-between rounded-md border border-line bg-bg-elev px-2 py-1.5">
         <div>
