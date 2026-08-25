@@ -23,8 +23,8 @@ export const PurchaseCard = memo(function PurchaseCard({
   const showGot = onGotInput && purchase.input_status === "waiting";
 
   return (
-    <div className="list-row -mx-4 flex items-start gap-3 px-4 py-3.5 active:bg-line/35">
-      <Link href={`/purchases/${purchase.id}`} prefetch className="min-w-0 flex-1">
+    <div className="list-row -mx-4 flex items-start gap-3 px-4 py-3.5 touch-pan-y active:bg-line/35">
+      <Link href={`/purchases/${purchase.id}`} prefetch draggable={false} className="min-w-0 flex-1 touch-pan-y">
         <div className="flex items-baseline justify-between gap-3">
           <p className="truncate text-[16px] font-medium leading-tight">{purchase.supplier_name}</p>
           <p className="tabular shrink-0 text-[16px] font-medium tracking-tight">

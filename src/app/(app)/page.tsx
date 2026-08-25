@@ -59,7 +59,7 @@ export default function HomePage() {
   return (
     <div className="space-y-5">
       <MonthBar month={month} onChange={setMonth} />
-      <div className="touch-pan-y space-y-5" {...swipe}>
+      <div className="swipe-pane touch-pan-y space-y-5" {...swipe}>
         <p className="sr-only">Swipe left or right to switch Waiting, Got, No, and All.</p>
         <p className="tabular text-[13px] text-muted">
           Waiting {formatCompact(totals.waitingGst)}

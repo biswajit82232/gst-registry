@@ -160,6 +160,17 @@ button,
   -webkit-user-drag: none;
 }
 
+.swipe-pane {
+  touch-action: pan-y;
+}
+
+.swipe-pane a,
+.swipe-pane button,
+.swipe-pane [role="button"],
+.swipe-pane [role="tab"] {
+  touch-action: pan-y;
+}
+
 img,
 svg {
   -webkit-user-drag: none;

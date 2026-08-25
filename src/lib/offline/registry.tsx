@@ -26,9 +26,11 @@ import {
 import {
   findLocalSupplier,
   isAuthError,
+  isClockSkewError,
   isTransientError,
   newId,
   nowIso,
+  publicSyncError,
   purchaseFromInput,
   runSync,
   SYNC_MS,
@@ -236,17 +238,29 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
         backoffMsRef.current = 0;
         authBlockedRef.current = false;
         setOnline(true);
-        setSyncError(result.error);
+        setSyncError(publicSyncError(result.error));
         setMissingSuppliersTable(result.missingSuppliersTable);
         if (result.changed) await reloadRef.current();
         else setLastSyncAt(Date.now());
       } catch (err) {
         const message = err instanceof Error ? err.message : "Sync failed.";
-        setSyncError(message);
-        if (isAuthError(message)) {
+        if (isClockSkewError(message)) {
+          lastFailRef.current = "transient";
+          backoffMsRef.current = Math.min(
+            SYNC_MS,
+            Math.max(1_200, (backoffMsRef.current || 600) * 2),
+          );
+          setSyncError(null);
+          try {
+            await getSupabase().auth.refreshSession();
+          } catch {
+            /* keep going; next retry uses the existing session */
+          }
+        } else if (isAuthError(message)) {
           lastFailRef.current = "auth";
           authBlockedRef.current = true;
           queuedRef.current = false;
+          setSyncError(null);
         } else if (isTransientError(message)) {
           lastFailRef.current = "transient";
           setOnline(false);
@@ -254,25 +268,28 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
             SYNC_MS,
             Math.max(1_000, (backoffMsRef.current || 500) * 2),
           );
+          setSyncError(publicSyncError(message));
         } else {
           lastFailRef.current = "other";
           backoffMsRef.current = SYNC_MS;
+          setSyncError(publicSyncError(message) ?? message);
         }
       } finally {
         syncingRef.current = false;
         if (show) setSyncing(false);
-        if (queuedRef.current) {
-          queuedRef.current = false;
-          if (lastFailRef.current === "auth") return;
-          const wait = lastFailRef.current === "none" ? 0 : backoffMsRef.current;
-          if (wait > 0) {
-            window.clearTimeout(retryTimerRef.current);
-            retryTimerRef.current = window.setTimeout(() => {
-              void runSyncCycle();
-            }, wait);
-          } else {
+        const retryQueued = queuedRef.current;
+        queuedRef.current = false;
+        if (lastFailRef.current === "auth") return;
+        const shouldRetry = retryQueued || lastFailRef.current === "transient";
+        if (!shouldRetry) return;
+        const wait = lastFailRef.current === "none" ? 0 : backoffMsRef.current;
+        if (wait > 0) {
+          window.clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = window.setTimeout(() => {
             void runSyncCycle();
-          }
+          }, wait);
+        } else {
+          void runSyncCycle();
         }
       }
     },
@@ -684,7 +701,7 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
     <DataContext.Provider value={data}>
       <SyncContext.Provider value={sync}>
         {!ready || firstDownload ? (
-          <BootScreen firstDownload={firstDownload} error={syncError} onRetry={() => void syncNow()} />
+          <BootScreen firstDownload={firstDownload} error={publicSyncError(syncError)} onRetry={() => void syncNow()} />
         ) : (
           children
         )}

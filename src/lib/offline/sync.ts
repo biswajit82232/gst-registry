@@ -26,7 +26,16 @@ export function isInputStatusSchemaError(message: string): boolean {
   return msg.includes("input_status") || msg.includes("input_on") || msg.includes("pgrst204");
 }
 
+export function isClockSkewError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    /used before issued|issued at future|iat.*future|token.*not yet valid|not valid yet/.test(m) ||
+    ((m.includes("jwt") || m.includes("token")) && m.includes("future"))
+  );
+}
+
 export function isTransientError(message: string): boolean {
+  if (isClockSkewError(message)) return true;
   const m = message.toLowerCase();
   return (
     /failed to fetch|networkerror|network request|load failed|offline|fetch failed|timeout|timed out|abort|econnreset|enotfound|socket/.test(
@@ -36,11 +45,18 @@ export function isTransientError(message: string): boolean {
 }
 
 export function isAuthError(message: string): boolean {
+  if (isClockSkewError(message)) return false;
   const m = message.toLowerCase();
   return (
     /jwt|not authenticated|unauthori[sz]ed|invalid claim|refresh token|session/.test(m) ||
     /\b401\b/.test(m)
   );
+}
+
+export function publicSyncError(message: string | null): string | null {
+  if (!message) return null;
+  if (isClockSkewError(message) || isAuthError(message)) return null;
+  return message;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -63,7 +79,7 @@ async function fetchPaged<T>(
       if (!isTransientError(error.message) || attempt === 2) {
         throw new Error(error.message);
       }
-      await sleep(400 * 2 ** attempt);
+      await sleep(isClockSkewError(error.message) ? 1200 : 400 * 2 ** attempt);
     }
     const page = rows ?? [];
     all.push(...page);
