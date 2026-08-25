@@ -1,9 +1,12 @@
 "use client";
 
+import { BrandMark } from "./brand";
+
 export function SetupScreen() {
   return (
     <div className="app-root mx-auto max-w-lg px-4 py-16">
-      <p className="text-[12px] text-muted">GST Registry</p>
+      <BrandMark size={64} alt="" />
+      <p className="mt-4 text-[12px] text-muted">GST Registry</p>
       <h1 className="mt-2 text-[24px] font-semibold tracking-tight">Connect Supabase to start</h1>
       <ol className="mt-6 list-decimal space-y-3 pl-5 text-[15px] leading-6 text-muted">
         <li>Create a free project at supabase.com</li>

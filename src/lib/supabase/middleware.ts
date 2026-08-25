@@ -46,6 +46,9 @@ export async function updateSession(request: NextRequest) {
     path === "/manifest.webmanifest" ||
     path === "/manifest" ||
     path.startsWith("/icon") ||
+    path.startsWith("/icons") ||
+    path.startsWith("/apple-icon") ||
+    path === "/logo.png" ||
     path === "/favicon.ico";
 
   if (!user && !isPublic) {

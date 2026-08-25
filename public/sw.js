@@ -1,4 +1,4 @@
-const CACHE = "gst-registry-v2";
+const CACHE = "gst-registry-v3";
 const PRECACHE = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -48,6 +48,8 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icon") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname === "/logo.png" ||
     url.pathname === "/manifest.webmanifest" ||
     url.pathname === "/apple-icon"
   ) {

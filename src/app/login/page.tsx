@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SetupScreen } from "@/components/setup-screen";
 import { Alert, Button, Field, inputClass } from "@/components/ui";
@@ -22,8 +23,9 @@ export default function LoginPage() {
           <ThemeToggle />
         </div>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
-          <p className="text-[12px] text-muted">GST purchase register</p>
-          <h1 className="mt-1 text-[28px] font-semibold tracking-tight">GST Registry</h1>
+          <h1 className="sr-only">GST Registry</h1>
+          <BrandMark size={88} alt="" />
+          <p className="mt-4 text-[12px] text-muted">GST purchase register</p>
           <form action={action} className="mt-8 space-y-4">
             <input type="hidden" name="mode" value={mode} />
             <Field label="Email">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandMark } from "./brand";
 import { BottomNav } from "./bottom-nav";
 import { SyncBadge } from "./sync-badge";
 import { ThemeToggle } from "./theme-toggle";
@@ -48,10 +49,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to content
       </a>
       <aside className="fixed inset-y-0 left-0 hidden w-56 border-r border-line p-5 md:flex md:flex-col">
-        <Link href="/" className="mb-8 block px-2">
-          <span className="block text-[15px] font-semibold tracking-tight">GST Registry</span>
-          <span className="mt-0.5 block truncate text-[12px] text-muted">
-            {profile?.business_name || "Purchase register"}
+        <Link href="/" className="mb-8 flex items-center gap-2.5 px-2">
+          <BrandMark size={36} className="shrink-0" alt="" />
+          <span className="min-w-0">
+            <span className="block text-[15px] font-semibold tracking-tight">GST Registry</span>
+            <span className="mt-0.5 block truncate text-[12px] text-muted">
+              {profile?.business_name || "Purchase register"}
+            </span>
           </span>
         </Link>
         <nav aria-label="Primary" className="flex flex-1 flex-col gap-1">
@@ -77,13 +81,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="app-scroll md:pl-56">
         <header className="safe-top safe-x sticky top-0 z-30 flex items-end justify-between gap-3 border-b border-line/80 bg-bg/92 pb-3 backdrop-blur md:px-8">
-          <div className="min-w-0">
-            {profile?.business_name ? (
-              <p className="truncate text-[12px] text-muted">{profile.business_name}</p>
-            ) : (
-              <p className="truncate text-[12px] text-muted md:hidden">GST Registry</p>
-            )}
-            <h1 className="truncate text-[20px] font-semibold tracking-tight">{title}</h1>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark size={32} className="shrink-0 md:hidden" alt="" />
+            <div className="min-w-0">
+              {profile?.business_name ? (
+                <p className="truncate text-[12px] text-muted">{profile.business_name}</p>
+              ) : (
+                <p className="truncate text-[12px] text-muted md:hidden">GST Registry</p>
+              )}
+              <h1 className="truncate text-[20px] font-semibold tracking-tight">{title}</h1>
+            </div>
           </div>
           <div className="flex shrink-0 items-center">
             <SyncBadge />

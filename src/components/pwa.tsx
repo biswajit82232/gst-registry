@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BrandMark } from "./brand";
 import { Button } from "./ui";
 
 type BeforeInstallPromptEvent = Event & {
@@ -121,24 +122,29 @@ export function InstallCard() {
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-[15px] font-medium">Install app</p>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <BrandMark size={40} className="shrink-0" alt="" />
+        <div>
+          <p className="text-[15px] font-medium">Install app</p>
+          {promptEvent ? (
+            <p className="mt-0.5 text-[13px] text-muted">Add GST Registry to the home screen like a normal app.</p>
+          ) : null}
+        </div>
+      </div>
       {promptEvent ? (
-        <>
-          <p className="text-[13px] text-muted">Add GST Registry to the home screen like a normal app.</p>
-          <Button
-            type="button"
-            className="w-full"
-            onClick={async () => {
-              await promptEvent.prompt();
-              const choice = await promptEvent.userChoice;
-              if (choice.outcome === "accepted") setInstalled(true);
-              setPromptEvent(null);
-            }}
-          >
-            Install
-          </Button>
-        </>
+        <Button
+          type="button"
+          className="w-full"
+          onClick={async () => {
+            await promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            if (choice.outcome === "accepted") setInstalled(true);
+            setPromptEvent(null);
+          }}
+        >
+          Install
+        </Button>
       ) : ios ? (
         <p className="text-[13px] leading-snug text-muted">
           Safari → Share → <span className="font-medium text-ink">Add to Home Screen</span>.
