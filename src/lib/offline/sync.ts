@@ -596,6 +596,10 @@ export async function runSync(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ error: string | null; missingSuppliersTable: boolean; changed: boolean }> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return { error: null, missingSuppliersTable: false, changed: false };
+  }
+
   const pushed = await pushDirty(db, supabase);
   const seeded = (await db.meta.get("seeded"))?.value === "1";
   const lastFull = Number((await db.meta.get("lastFullPull"))?.value || 0);

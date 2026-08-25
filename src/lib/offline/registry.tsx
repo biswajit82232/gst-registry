@@ -11,6 +11,7 @@ import {
 } from "react";
 import { currentMonth, todayIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
+import { forgetLocalUser, peekStoredUser, rememberLocalUser } from "@/lib/supabase/local-user";
 import type { InputStatus, Profile, Purchase, PurchaseInput, Supplier } from "@/lib/types";
 import {
   deleteDb,
@@ -314,27 +315,51 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let alive = true;
     (async () => {
+      let user = peekStoredUser();
       const supabase = getSupabase();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+
+      if (!user && (typeof navigator === "undefined" || navigator.onLine)) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          const sessionUser = data.session?.user;
+          if (sessionUser?.id) user = { id: sessionUser.id, email: sessionUser.email ?? null };
+        } catch {
+          /* keep going */
+        }
+        if (!user) {
+          try {
+            const { data } = await supabase.auth.getUser();
+            if (data.user?.id) user = { id: data.user.id, email: data.user.email ?? null };
+          } catch {
+            /* stay on the stored copy if this is just a network failure */
+          }
+        }
+      }
+
       if (!alive) return;
       if (!user) {
         setReady(true);
         return;
       }
+
+      rememberLocalUser(user);
       userIdRef.current = user.id;
-      emailRef.current = user.email ?? null;
+      emailRef.current = user.email;
       setUserId(user.id);
-      setUserEmail(user.email ?? null);
+      setUserEmail(user.email);
       const db = getDb(user.id);
       dbRef.current = db;
       await reload();
       if (!alive) return;
       const seeded = (await db.meta.get("seeded"))?.value === "1";
+      const localCount = await db.purchases.count();
       if (!alive) return;
-      setFirstDownload(!seeded);
+      setFirstDownload(!seeded && localCount === 0);
       setReady(true);
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setOnline(false);
+        return;
+      }
       await runSyncCycle({ fromUser: true });
     })().catch(() => {
       if (alive) {
@@ -637,6 +662,7 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
     dbRef.current = null;
     userIdRef.current = null;
     supabaseRef.current = null;
+    forgetLocalUser();
     setPurchases([]);
     setSuppliers([]);
     setProfile(null);
@@ -701,7 +727,7 @@ export function RegistryProvider({ children }: { children: React.ReactNode }) {
   return (
     <DataContext.Provider value={data}>
       <SyncContext.Provider value={sync}>
-        {!ready || firstDownload ? (
+        {!ready || (firstDownload && purchases.length === 0) ? (
           <BootScreen firstDownload={firstDownload} error={publicSyncError(syncError)} onRetry={() => void syncNow()} />
         ) : (
           children
