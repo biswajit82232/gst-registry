@@ -25,6 +25,9 @@ export const metadata: Metadata = {
     title: "GST Registry",
     statusBarStyle: "black-translucent",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport: Viewport = {
@@ -34,6 +37,9 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   colorScheme: "light dark",
   interactiveWidget: "resizes-content",
@@ -41,7 +47,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${plusJakarta.variable} h-full`}>
+    <html lang="en" translate="no" suppressHydrationWarning className={`${plusJakarta.variable} h-full`}>
       <body className="min-h-full bg-bg text-ink antialiased">
         <ThemeProvider>
           <ViewportFit />

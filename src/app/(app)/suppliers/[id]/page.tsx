@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PurchaseCard, PurchaseList } from "@/components/purchase-card";
 import { SupplierForm } from "@/components/supplier-form";
-import { Button, Empty } from "@/components/ui";
+import { Alert, Button, Confirm, Empty } from "@/components/ui";
 import { formatInr } from "@/lib/format";
 import { billsForSupplier } from "@/lib/input";
 import { totalsOf } from "@/lib/gst";
@@ -17,6 +17,8 @@ export default function SupplierDetailPage() {
   const { suppliers, purchases, deleteSupplier } = useRegistry();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const supplier = useMemo(
     () => suppliers.find((row) => row.id === params.id) ?? null,
@@ -29,13 +31,14 @@ export default function SupplierDetailPage() {
   const totals = useMemo(() => totalsOf(bills), [bills]);
 
   async function remove() {
-    if (!supplier || !confirm("Delete this party? Bills stay in the register.")) return;
+    if (!supplier) return;
     setBusy(true);
+    setConfirmDelete(false);
     try {
       await deleteSupplier(supplier.id);
       router.push("/suppliers");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not delete this party.");
+      setHint(err instanceof Error ? err.message : "Could not delete this party.");
       setBusy(false);
     }
   }
@@ -54,7 +57,7 @@ export default function SupplierDetailPage() {
   if (editing) {
     return (
       <div>
-        <button type="button" className="mb-4 min-h-11 text-[13px] text-muted" onClick={() => setEditing(false)}>
+        <button type="button" className="mb-4 min-h-11 text-[13px] text-muted active:opacity-60" onClick={() => setEditing(false)}>
           Cancel
         </button>
         <SupplierForm supplier={supplier} onSaved={() => setEditing(false)} />
@@ -80,17 +83,18 @@ export default function SupplierDetailPage() {
       <div className="flex gap-2">
         <Link
           href={`/purchases/new?supplier=${supplier.id}`}
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
+          className="inline-flex h-11 flex-1 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white active:opacity-80 dark:bg-teal-400 dark:text-teal-950"
         >
           Add bill
         </Link>
         <Button variant="outline" onClick={() => setEditing(true)} disabled={busy}>
           Edit
         </Button>
-        <Button variant="danger" onClick={remove} disabled={busy}>
+        <Button variant="danger" onClick={() => setConfirmDelete(true)} disabled={busy}>
           Delete
         </Button>
       </div>
+      {hint ? <Alert tone="danger">{hint}</Alert> : null}
 
       {bills.length === 0 ? (
         <Empty title="No bills yet" hint="Add a bill for this party from here or the Add tab." />
@@ -101,6 +105,13 @@ export default function SupplierDetailPage() {
           ))}
         </PurchaseList>
       )}
+      <Confirm
+        open={confirmDelete}
+        title="Delete this party?"
+        body="Bills stay in the register."
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

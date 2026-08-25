@@ -101,7 +101,7 @@ export default function HomePage() {
             {rows.length === 0 ? (
               <Link
                 href="/purchases/new"
-                className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
+            className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white active:opacity-80 dark:bg-teal-400 dark:text-teal-950"
               >
                 Add bill
               </Link>

@@ -110,7 +110,7 @@ export function Segmented<T extends string | number>({
             aria-pressed={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "min-h-10 min-w-0 flex-1 rounded-[10px] px-1 text-[13px] font-medium",
+              "min-h-10 min-w-0 flex-1 rounded-[10px] px-1 text-[13px] font-medium active:opacity-80",
               active ? cn("bg-bg-elev text-ink shadow-sm", item.activeClass) : "text-muted",
             )}
           >
@@ -134,7 +134,7 @@ export function UnderlineTabs<T extends string>({
   ariaLabel?: string;
 }) {
   return (
-    <div className="flex gap-5 overflow-x-auto overscroll-x-contain border-b border-line" role="tablist" aria-label={ariaLabel}>
+    <div className="no-scrollbar flex gap-5 overflow-x-auto overscroll-x-contain border-b border-line" role="tablist" aria-label={ariaLabel}>
       {options.map((item) => {
         const active = value === item.id;
         return (
@@ -145,7 +145,7 @@ export function UnderlineTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "-mb-px shrink-0 border-b-2 py-2.5 text-[13px]",
+              "-mb-px shrink-0 border-b-2 py-2.5 text-[13px] active:opacity-70",
               active ? "border-ink font-medium text-ink" : "border-transparent text-muted",
             )}
           >
@@ -228,5 +228,52 @@ export function TextLink({
     <Link href={href} className={cn("text-[13px] font-medium text-ink underline-offset-2 hover:underline", className)}>
       {children}
     </Link>
+  );
+}
+
+export function Confirm({
+  open,
+  title,
+  body,
+  confirmLabel = "Delete",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  body?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/35 p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] md:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-lg border border-line bg-bg-elev p-4 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p id="confirm-title" className="text-[15px] font-medium">
+          {title}
+        </p>
+        {body ? <p className="mt-1 text-[13px] leading-snug text-muted">{body}</p> : null}
+        <div className="mt-4 flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+          <Button type="button" variant="danger" className="flex-1 bg-rose-50 dark:bg-rose-950/40" onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

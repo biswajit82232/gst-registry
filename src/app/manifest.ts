@@ -9,12 +9,16 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    display_override: ["standalone", "minimal-ui", "browser"],
+    display_override: ["standalone", "fullscreen"],
     orientation: "portrait-primary",
     lang: "en",
     dir: "ltr",
     theme_color: "#f7f6f3",
     background_color: "#f7f6f3",
+    prefer_related_applications: false,
+    launch_handler: {
+      client_mode: ["focus-existing", "navigate-existing"],
+    },
     categories: ["finance", "business", "productivity"],
     icons: [
       {

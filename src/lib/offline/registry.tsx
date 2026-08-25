@@ -703,7 +703,7 @@ function BootScreen({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
+    <div className="app-root flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="max-w-xs text-center">
         <p className="text-[15px] font-semibold" aria-live="polite">
           {firstDownload ? "Downloading register" : "Opening"}
@@ -719,7 +719,7 @@ function BootScreen({
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white active:opacity-80 dark:bg-teal-400 dark:text-teal-950"
             >
               Retry
             </button>

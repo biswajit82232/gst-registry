@@ -75,6 +75,8 @@ export function SupplierPicker({
         className={inputClass()}
         placeholder="Type or pick a party"
         autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
         value={name}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
@@ -102,7 +104,7 @@ export function SupplierPicker({
       {showList ? (
         <ul
           role="listbox"
-        className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-md border border-line bg-bg-elev py-1 shadow-lg"
+          className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-md border border-line bg-bg-elev py-1 shadow-lg"
         >
           {matches.map((s) => (
             <li key={s.id} role="option">

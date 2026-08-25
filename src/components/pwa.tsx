@@ -12,6 +12,7 @@ function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
     ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
   );
 }
@@ -21,10 +22,66 @@ function isIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+function isFormField(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return Boolean(el?.closest("input, textarea, select, [contenteditable='true'], .selectable"));
+}
+
+function themeColor(): string {
+  return document.documentElement.classList.contains("dark") ? "#11110f" : "#f7f6f3";
+}
+
+function syncThemeColor() {
+  const color = themeColor();
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute("content", color);
+  }
+}
+
 export function PwaRegister() {
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    void navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    }
+
+    const root = document.documentElement;
+    const applyStandalone = () => root.classList.toggle("standalone", isStandalone());
+    applyStandalone();
+
+    const onContextMenu = (event: Event) => {
+      if (!isStandalone() && !window.matchMedia("(pointer: coarse)").matches) return;
+      if (isFormField(event.target)) return;
+      event.preventDefault();
+    };
+    const onDragStart = (event: DragEvent) => {
+      if (isFormField(event.target)) return;
+      event.preventDefault();
+    };
+    const onGesture = (event: Event) => {
+      event.preventDefault();
+    };
+
+    syncThemeColor();
+    const themeWatch = new MutationObserver(syncThemeColor);
+    themeWatch.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+    const standaloneWatch = window.matchMedia("(display-mode: standalone)");
+    standaloneWatch.addEventListener("change", applyStandalone);
+
+    document.addEventListener("contextmenu", onContextMenu, { capture: true });
+    document.addEventListener("dragstart", onDragStart, { capture: true });
+    document.addEventListener("gesturestart", onGesture, { capture: true } as AddEventListenerOptions);
+    document.addEventListener("gesturechange", onGesture, { capture: true } as AddEventListenerOptions);
+
+    return () => {
+      themeWatch.disconnect();
+      standaloneWatch.removeEventListener("change", applyStandalone);
+      document.removeEventListener("contextmenu", onContextMenu, { capture: true });
+      document.removeEventListener("dragstart", onDragStart, { capture: true });
+      document.removeEventListener("gesturestart", onGesture, { capture: true } as AddEventListenerOptions);
+      document.removeEventListener("gesturechange", onGesture, { capture: true } as AddEventListenerOptions);
+      root.classList.remove("standalone");
+    };
   }, []);
   return null;
 }

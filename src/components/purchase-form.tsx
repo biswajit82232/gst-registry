@@ -257,7 +257,7 @@ export function PurchaseForm({
                   <button
                     type="button"
                     aria-label="Remove item"
-                    className="h-11 w-11 shrink-0 text-[18px] text-muted"
+                    className="h-11 w-11 shrink-0 text-[18px] text-muted active:opacity-60"
                     onClick={() => setLines((prev) => prev.filter((_, i) => i !== index))}
                   >
                     ×
@@ -281,7 +281,7 @@ export function PurchaseForm({
           ))}
           <button
             type="button"
-            className="min-h-11 text-[13px] font-medium text-ink"
+            className="min-h-11 text-[13px] font-medium text-ink active:opacity-60"
             onClick={() =>
               setLines((prev) => [...prev, { taxable: 0, rate: nextUnusedRate(prev.map((line) => line.rate)) }])
             }

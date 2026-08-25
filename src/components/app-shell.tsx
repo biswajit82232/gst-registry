@@ -40,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const title = titleFor(pathname);
 
   return (
-    <div className="min-h-dvh bg-bg">
+    <div className="app-root min-h-dvh bg-bg">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-bg-elev focus:px-3 focus:py-2"
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 items-center rounded-md px-2 text-[14px]",
+                  "flex min-h-11 items-center rounded-md px-2 text-[14px] active:bg-line/40",
                   active ? "font-medium text-ink" : "text-muted hover:text-ink",
                 )}
               >
@@ -75,8 +75,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      <div className="md:pl-56">
-        <header className="safe-top safe-x sticky top-0 z-30 flex items-end justify-between gap-3 bg-bg/90 pb-3 backdrop-blur md:px-8">
+      <div className="app-scroll md:pl-56">
+        <header className="safe-top safe-x sticky top-0 z-30 flex items-end justify-between gap-3 border-b border-line/80 bg-bg/92 pb-3 backdrop-blur md:px-8">
           <div className="min-w-0">
             {profile?.business_name ? (
               <p className="truncate text-[12px] text-muted">{profile.business_name}</p>

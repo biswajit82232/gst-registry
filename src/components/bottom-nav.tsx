@@ -34,11 +34,12 @@ export function BottomNav() {
                 prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px]",
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] active:bg-line/40",
                   active ? "font-medium text-ink" : "text-muted",
                 )}
               >
                 <Icon
+                  aria-hidden
                   className={cn("h-[18px] w-[18px]", item.primary && !active && "text-teal-800 dark:text-teal-300")}
                   strokeWidth={active || item.primary ? 2.2 : 1.7}
                 />

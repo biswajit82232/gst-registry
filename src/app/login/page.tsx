@@ -16,11 +16,12 @@ export default function LoginPage() {
   if (!isSupabaseConfigured()) return <SetupScreen />;
 
   return (
-    <div className="safe-x flex min-h-dvh flex-col bg-bg pb-[max(2.5rem,env(safe-area-inset-bottom,0px))]">
-      <div className="safe-top flex justify-end">
-        <ThemeToggle />
-      </div>
-      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
+    <div className="app-root safe-x flex min-h-dvh flex-col bg-bg pb-[max(2.5rem,env(safe-area-inset-bottom,0px))]">
+      <div className="app-scroll flex min-h-dvh flex-col">
+        <div className="safe-top flex justify-end">
+          <ThemeToggle />
+        </div>
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
         <p className="text-[12px] text-muted">GST purchase register</p>
         <h1 className="mt-1 text-[28px] font-semibold tracking-tight">GST Registry</h1>
         <form action={action} className="mt-8 space-y-4">
@@ -31,6 +32,9 @@ export default function LoginPage() {
               name="email"
               required
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               enterKeyHint="next"
               className={inputClass()}
             />
@@ -54,11 +58,12 @@ export default function LoginPage() {
         </form>
         <button
           type="button"
-          className="mt-6 min-h-11 text-[13px] text-muted"
+          className="mt-6 min-h-11 text-[13px] text-muted active:opacity-60"
           onClick={() => setMode(mode === "in" ? "up" : "in")}
         >
           {mode === "in" ? "New here? Create an account" : "Already registered? Sign in"}
         </button>
+        </div>
       </div>
     </div>
   );

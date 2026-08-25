@@ -34,13 +34,18 @@ export default function SuppliersPage() {
         <input
           className={inputClass("flex-1")}
           placeholder="Search"
+          type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          enterKeyHint="search"
         />
         <Link
           href="/suppliers/new"
-          className="inline-flex h-11 shrink-0 items-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white dark:bg-teal-400 dark:text-teal-950"
+          className="inline-flex h-11 shrink-0 items-center rounded-md bg-teal-800 px-4 text-[14px] font-medium text-white active:opacity-80 dark:bg-teal-400 dark:text-teal-950"
         >
           Add
         </Link>
@@ -63,7 +68,7 @@ export default function SuppliersPage() {
               key={supplier.id}
               href={`/suppliers/${supplier.id}`}
               prefetch
-              className="flex items-center justify-between gap-3 py-3.5"
+              className="-mx-4 flex items-center justify-between gap-3 px-4 py-3.5 active:bg-line/35"
             >
               <div className="min-w-0">
                 <p className="truncate text-[16px] font-medium leading-tight">{supplier.name}</p>

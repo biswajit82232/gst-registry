@@ -54,9 +54,11 @@ export default function SettingsPage() {
         </Button>
       </form>
 
-      <InstallCard />
+      <div className="border-t border-line pt-8">
+        <InstallCard />
+      </div>
 
-      <div className="flex items-center justify-between py-1">
+      <div className="flex items-center justify-between border-t border-line py-1 pt-6">
         <div>
           <p className="text-[15px] font-medium">Appearance</p>
           <p className="text-[13px] text-muted">Light or dark</p>
@@ -64,7 +66,12 @@ export default function SettingsPage() {
         <ThemeToggle />
       </div>
 
-      <Button variant="ghost" className="w-full text-muted" type="button" onClick={() => void onSignOut()}>
+      <Button
+        variant="ghost"
+        className="w-full border-t border-line pt-6 text-muted"
+        type="button"
+        onClick={() => void onSignOut()}
+      >
         Sign out
       </Button>
     </div>

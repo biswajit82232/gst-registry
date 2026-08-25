@@ -23,7 +23,7 @@ export const PurchaseCard = memo(function PurchaseCard({
   const showGot = onGotInput && purchase.input_status === "waiting";
 
   return (
-    <div className="list-row flex items-start gap-3 py-3.5">
+    <div className="list-row -mx-4 flex items-start gap-3 px-4 py-3.5 active:bg-line/35">
       <Link href={`/purchases/${purchase.id}`} prefetch className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <p className="truncate text-[16px] font-medium leading-tight">{purchase.supplier_name}</p>
@@ -44,7 +44,7 @@ export const PurchaseCard = memo(function PurchaseCard({
         <button
           type="button"
           onClick={() => onGotInput(purchase.id)}
-          className="mt-0.5 h-10 shrink-0 text-[13px] font-medium text-teal-800 dark:text-teal-300"
+          className="mt-0.5 h-10 shrink-0 text-[13px] font-medium text-teal-800 active:opacity-60 dark:text-teal-300"
         >
           Got
         </button>
@@ -69,7 +69,7 @@ export function ShowMore({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-12 w-full items-center justify-center text-[13px] text-muted"
+      className="flex min-h-12 w-full items-center justify-center text-[13px] text-muted active:opacity-60"
     >
       Show {remaining} more
     </button>

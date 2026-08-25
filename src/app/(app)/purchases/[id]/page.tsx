@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PurchaseForm, StatusPicker } from "@/components/purchase-form";
-import { Alert, Button } from "@/components/ui";
+import { Alert, Button, Confirm } from "@/components/ui";
 import { formatDate, formatInr } from "@/lib/format";
 import { decodeLines, lineGst, lineTotal, toNumber } from "@/lib/gst";
 import { gstOf } from "@/lib/input";
@@ -18,6 +18,7 @@ export default function PurchaseDetailPage() {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const purchase = useMemo(
     () => purchases.find((row) => row.id === params.id) ?? null,
@@ -35,13 +36,14 @@ export default function PurchaseDetailPage() {
   const filled = lines.filter((line) => toNumber(line.taxable) > 0);
 
   async function remove() {
-    if (!purchase || !confirm("Delete this bill?")) return;
+    if (!purchase) return;
     setBusy(true);
+    setConfirmDelete(false);
     try {
       await deletePurchase(purchase.id);
       router.push("/");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not delete this bill.");
+      setHint(err instanceof Error ? err.message : "Could not delete this bill.");
       setBusy(false);
     }
   }
@@ -73,7 +75,7 @@ export default function PurchaseDetailPage() {
   if (editing) {
     return (
       <div>
-        <button type="button" className="mb-4 min-h-11 text-[13px] text-muted" onClick={() => setEditing(false)}>
+        <button type="button" className="mb-4 min-h-11 text-[13px] text-muted active:opacity-60" onClick={() => setEditing(false)}>
           Cancel
         </button>
         <PurchaseForm profile={profile} purchase={purchase} onSaved={() => setEditing(false)} />
@@ -126,10 +128,17 @@ export default function PurchaseDetailPage() {
         <Button className="flex-1" onClick={() => setEditing(true)} disabled={busy}>
           Edit
         </Button>
-        <Button variant="danger" onClick={remove} disabled={busy}>
+        <Button variant="danger" onClick={() => setConfirmDelete(true)} disabled={busy}>
           Delete
         </Button>
       </div>
+      <Confirm
+        open={confirmDelete}
+        title="Delete this bill?"
+        body="It will be removed from the register."
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
