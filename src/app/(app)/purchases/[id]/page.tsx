@@ -105,14 +105,16 @@ export default function PurchaseDetailPage() {
       </div>
 
       {filled.length > 1 ? (
-        <ul className="divide-y divide-line text-[14px]">
+        <ul className="divide-y divide-line">
           {filled.map((line, i) => (
-            <li key={i} className="flex items-baseline justify-between gap-3 py-2.5">
-              <span className="text-muted">
-                {formatInr(line.taxable)} · {line.rate}%
-              </span>
-              <span className="tabular">
-                GST {formatInr(lineGst(line))} · {formatInr(lineTotal(line))}
+            <li
+              key={i}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 py-2.5"
+            >
+              <span className="truncate text-[15px]">{line.rate}%</span>
+              <span className="tabular text-[15px] font-medium">{formatInr(lineTotal(line))}</span>
+              <span className="truncate text-[12px] text-muted sm:text-[13px]">
+                GST {formatInr(lineGst(line))} · before GST {formatInr(toNumber(line.taxable))}
               </span>
             </li>
           ))}

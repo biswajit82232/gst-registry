@@ -1,10 +1,10 @@
 "use client";
 
 import { memo } from "react";
-import Link from "next/link";
-import { formatDate, formatInr } from "@/lib/format";
+import { formatInr, formatListDate } from "@/lib/format";
 import { gstOf, inputLabel } from "@/lib/input";
 import type { Purchase } from "@/lib/types";
+import { TwoLineRow } from "./ui";
 
 function statusClass(status: Purchase["input_status"]) {
   if (status === "got") return "text-emerald-700 dark:text-emerald-300";
@@ -21,35 +21,30 @@ export const PurchaseCard = memo(function PurchaseCard({
 }) {
   const gst = gstOf(purchase);
   const showGot = onGotInput && purchase.input_status === "waiting";
+  const invoice = purchase.invoice_number.trim();
+  const meta = [formatListDate(purchase.invoice_date), invoice || null, gst > 0 ? `GST ${formatInr(gst)}` : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="list-row -mx-4 flex items-start gap-3 px-4 py-3.5 touch-pan-y active:bg-line/35">
-      <Link href={`/purchases/${purchase.id}`} prefetch draggable={false} className="min-w-0 flex-1 touch-pan-y">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="truncate text-[16px] font-medium leading-tight">{purchase.supplier_name}</p>
-          <p className="tabular shrink-0 text-[16px] font-medium tracking-tight">
-            {formatInr(purchase.invoice_total)}
-          </p>
-        </div>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] text-muted">
-          <span>
-            {formatDate(purchase.invoice_date)}
-            {purchase.invoice_number.trim() ? ` · ${purchase.invoice_number}` : ""}
-          </span>
-          {gst > 0 ? <span>GST {formatInr(gst)}</span> : null}
-          <span className={statusClass(purchase.input_status)}>{inputLabel(purchase.input_status)}</span>
-        </p>
-      </Link>
-      {showGot ? (
-        <button
-          type="button"
-          onClick={() => onGotInput(purchase.id)}
-          className="mt-0.5 h-10 shrink-0 text-[13px] font-medium text-teal-800 active:opacity-60 dark:text-teal-300"
-        >
-          Got
-        </button>
-      ) : null}
-    </div>
+    <TwoLineRow
+      href={`/purchases/${purchase.id}`}
+      title={purchase.supplier_name}
+      value={formatInr(purchase.invoice_total)}
+      meta={meta}
+      aside={<span className={statusClass(purchase.input_status)}>{inputLabel(purchase.input_status)}</span>}
+      action={
+        showGot ? (
+          <button
+            type="button"
+            onClick={() => onGotInput(purchase.id)}
+            className="h-10 shrink-0 px-1 text-[13px] font-medium text-teal-800 active:opacity-60 dark:text-teal-300"
+          >
+            Got
+          </button>
+        ) : null
+      }
+    />
   );
 });
 

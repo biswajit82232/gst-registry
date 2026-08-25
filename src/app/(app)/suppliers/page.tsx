@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, Empty, inputClass } from "@/components/ui";
-import { formatCompact } from "@/lib/format";
+import { Alert, Empty, TwoLineRow, inputClass } from "@/components/ui";
+import { formatInr } from "@/lib/format";
 import { billsForSupplier } from "@/lib/input";
 import { totalsOf } from "@/lib/gst";
 import { useRegistry } from "@/lib/offline/registry";
@@ -63,25 +63,24 @@ export default function SuppliersPage() {
         </Empty>
       ) : (
         <div className="divide-y divide-line">
-          {rows.map(({ supplier, bills, totals }) => (
-            <Link
-              key={supplier.id}
-              href={`/suppliers/${supplier.id}`}
-              prefetch
-              className="-mx-4 flex items-center justify-between gap-3 px-4 py-3.5 active:bg-line/35"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-[16px] font-medium leading-tight">{supplier.name}</p>
-                <p className="mt-1 truncate text-[13px] text-muted">
-                  {supplier.gstin || "No GSTIN"}
-                  {bills.length ? ` · ${bills.length} bill${bills.length === 1 ? "" : "s"}` : ""}
-                </p>
-              </div>
-              {totals.gst > 0 ? (
-                <p className="tabular shrink-0 text-[14px] text-muted">{formatCompact(totals.gst)}</p>
-              ) : null}
-            </Link>
-          ))}
+          {rows.map(({ supplier, bills, totals }) => {
+            const count = bills.length;
+            const meta = [
+              supplier.gstin || "No GSTIN",
+              count ? `${count} ${count === 1 ? "bill" : "bills"}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <TwoLineRow
+                key={supplier.id}
+                href={`/suppliers/${supplier.id}`}
+                title={supplier.name}
+                value={totals.gst > 0 ? formatInr(totals.gst) : ""}
+                meta={meta}
+              />
+            );
+          })}
         </div>
       )}
     </div>

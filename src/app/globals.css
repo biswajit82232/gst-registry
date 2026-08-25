@@ -237,7 +237,7 @@ input[type="number"] {
 
 .list-row {
   content-visibility: auto;
-  contain-intrinsic-size: auto 4.25rem;
+  contain-intrinsic-size: auto 4rem;
 }
 
 .no-scrollbar {

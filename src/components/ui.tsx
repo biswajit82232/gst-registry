@@ -231,6 +231,43 @@ export function TextLink({
   );
 }
 
+export function TwoLineRow({
+  href,
+  title,
+  value,
+  meta,
+  aside,
+  action,
+}: {
+  href: string;
+  title: string;
+  value: string;
+  meta: string;
+  aside?: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="list-row -mx-4 flex items-center gap-2 px-4 py-3 touch-pan-y active:bg-line/35 sm:py-3.5">
+      <Link
+        href={href}
+        prefetch
+        draggable={false}
+        className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 touch-pan-y"
+      >
+        <p className="truncate text-[15px] font-medium leading-5 tracking-tight sm:text-[16px]">{title}</p>
+        <p className="tabular shrink-0 text-right text-[15px] font-medium leading-5 tracking-tight sm:text-[16px]">
+          {value}
+        </p>
+        <p className="min-w-0 truncate text-[12px] leading-4 text-muted sm:text-[13px]">{meta}</p>
+        <p className="max-w-[9.5rem] truncate text-right text-[12px] leading-4 sm:max-w-none sm:text-[13px]">
+          {aside}
+        </p>
+      </Link>
+      {action}
+    </div>
+  );
+}
+
 export function Confirm({
   open,
   title,
