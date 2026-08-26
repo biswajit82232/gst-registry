@@ -1,4 +1,4 @@
-const CACHE = "gst-registry-v3";
+const CACHE = "gst-registry-v4";
 const PRECACHE = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
